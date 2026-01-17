@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import "./PreferenceForm.css";
+import Navbar from "../components/Navbar"
+
 
 export default function WorkoutForm() {
   const [formData, setFormData] = useState({
@@ -51,6 +53,7 @@ export default function WorkoutForm() {
   if (submitted) {
     return (
       <div className="body">
+        <Navbar />
         <div className="container">
           <div className="confirmation">
             <div className="checkmark">
@@ -88,6 +91,7 @@ export default function WorkoutForm() {
   // Non filled out form
   return (
     <div className="body">
+      <Navbar />
       <div className="container">
         <h1 className="title">Workout Preferences</h1>
         <p className="subtitle">Customize your workout plan</p>
