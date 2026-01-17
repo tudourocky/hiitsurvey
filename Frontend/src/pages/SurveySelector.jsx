@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef} from 'react';
 import "./SurveySelector.css"
-import ChevronSVG from './ChevronSVG';
+import ChevronSVG from '../ChevronSVG';
+import Navbar from "../components/Navbar"
+
 // Throttle scrolling
 const ArcadeSongSelector = () => {
   const songs = [
@@ -88,6 +90,7 @@ const ArcadeSongSelector = () => {
 
   return (
     <div className="container">
+      <Navbar />
       <style>{`
         @keyframes scan {
           0% { transform: translateY(0); }
