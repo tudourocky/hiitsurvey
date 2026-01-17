@@ -4,7 +4,7 @@ import "./SurveySelector.css"
 import ChevronSVG from '../ChevronSVG';
 import Navbar from "../components/Navbar"
 
-const ArcadeSongSelector = () => {
+const ArcadeSurveySelector = () => {
   const navigate = useNavigate();
   const songs = [
     { title: "Electric Dreams", artist: "Neon Pulse",  icon: "⚡", color: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" },
@@ -54,8 +54,8 @@ const ArcadeSongSelector = () => {
     if (offset > total / 2) offset -= total;
     if (offset < -total / 2) offset += total;
     const isActive = offset === 0;
-    const distance = Math.abs(offset) * 80 + (isActive ? 0 : 200);
-    const scale = isActive ? 1 : 0.7 - Math.abs(offset) * 0.1;
+    const distance = Math.abs(offset) * 500 + (isActive ? 0 : 200);
+    const scale = isActive ? 1 : 1.0 - Math.abs(offset) * 0.1;
     const opacity = isActive ? 1 : Math.max(0.3, 1 - Math.abs(offset) * 0.2);
     const angle = offset * 25;
     return {
@@ -71,7 +71,7 @@ const ArcadeSongSelector = () => {
     wheelLock.current = true;
     if (e.deltaX < 0) navigateCarousel(-1);
     else navigateCarousel(1);
-    setTimeout(() => { wheelLock.current = false; }, 100);
+    setTimeout(() => { wheelLock.current = false; }, 300);
   }
 
   return (
@@ -111,9 +111,6 @@ const ArcadeSongSelector = () => {
           </div>
 
           <div className="controls">
-            <button onClick={() => navigateCarousel(-1)} className="btn secondary">PREV</button>
-            <button onClick={selectSong} className="btn">PLAY</button>
-            <button onClick={() => navigateCarousel(1)} className="btn secondary">NEXT</button>
           </div>
         </div>
       </div>
@@ -121,4 +118,4 @@ const ArcadeSongSelector = () => {
   );
 };
 
-export default ArcadeSongSelector;
+export default ArcadeSurveySelector;

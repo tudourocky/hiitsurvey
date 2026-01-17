@@ -7,6 +7,7 @@
 :root {
   --neon-pink: #ff00ff;
   --neon-blue: #00ffff;
+  --neon-red: #ff0000;
   --neon-purple: #bc13fe;
   --neon-yellow: #ffff00;
   --glitch-red: #ff0000;
@@ -156,6 +157,10 @@ button:hover::before {
   box-shadow: 
     0 0 15px var(--neon-pink),
     inset 0 0 10px var(--neon-pink);
+}
+.neon-text-red {
+  color: var(--neon-red);
+  text-shadow: 0 0 10px var(--neon-red);
 }
 
 @keyframes scan {

@@ -23,6 +23,7 @@
   font-size: 1rem;
   margin-bottom: 1.5rem;
   text-align: center;
+  transition: all 0.3s;
 }
 
 .radio-grid {
