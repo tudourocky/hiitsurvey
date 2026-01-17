@@ -1,0 +1,210 @@
+/* Container */
+.container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a0033 0%, #330066 50%, #1a0033 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  font-family: "Arial Black", sans-serif;
+}
+
+/* Scanlines overlay */
+.scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Arcade frame */
+.arcade-frame {
+  background: linear-gradient(145deg, #ff00ff, #00ffff);
+  padding: 8px;
+  border-radius: 20px;
+  box-shadow: 0 0 50px rgba(255, 0, 255, 0.5);
+}
+
+/* Screen */
+.screen {
+  background: #000;
+  border-radius: 12px;
+  padding: 40px 20px;
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Title */
+.title {
+  color: #fff;
+  font-size: 2em;
+  font-weight: 900;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  text-shadow: 0 0 20px #ff00ff, 0 0 40px #ff00ff;
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+/* Subtitle */
+.subtitle {
+  color: #00ffff;
+  font-size: 0.9em;
+  margin-bottom: 40px;
+  letter-spacing: 3px;
+}
+
+/* Carousel container */
+.carousel-container {
+  width: 100%;
+  max-width: 900px;
+  height: 350px;
+  position: relative;
+  perspective: 1000px;
+}
+
+/* Carousel */
+.carousel {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Card */
+.card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin-left: -110px;
+  margin-top: -140px;
+  width: 220px;
+  height: 280px;
+  background: linear-gradient(145deg, #1a1a2e, #16213e);
+  border-radius: 15px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid #333;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Active card */
+.card.active {
+  width: 260px;
+  height: 320px;
+  margin-left: -130px;
+  margin-top: -160px;
+  border: 3px solid #ff00ff;
+  box-shadow:
+    0 0 40px rgba(255, 0, 255, 0.6),
+    inset 0 0 20px rgba(255, 0, 255, 0.1);
+}
+
+/* Album art */
+.album-art {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3em;
+  margin-bottom: 15px;
+  transition: all 0.3s;
+}
+
+/* Active album art */
+.album-art.active {
+  box-shadow: 0 5px 20px rgba(255, 0, 255, 0.4);
+}
+
+/* Song info */
+.song-info {
+  text-align: center;
+  width: 100%;
+}
+
+/* Song title */
+.song-title {
+  color: #fff;
+  font-size: 1em;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+/* Active song title */
+.song-title.active {
+  color: #ff00ff;
+  font-size: 1.1em;
+}
+
+/* Song artist */
+.song-artist {
+  color: #aaa;
+  font-size: 0.85em;
+  font-weight: normal;
+}
+
+/* Difficulty */
+.difficulty {
+  display: flex;
+  gap: 5px;
+  margin-top: 10px;
+  justify-content: center;
+}
+
+/* Difficulty star */
+.difficulty-star {
+  color: #666;
+  font-size: 0.9em;
+}
+
+/* Active difficulty star */
+.difficulty-star.active {
+  color: #ffff00;
+}
+
+/* Controls */
+.controls {
+  margin-top: 40px;
+  display: flex;
+  gap: 20px;
+}
+
+/* Buttons */
+.btn {
+  background: linear-gradient(145deg, #ff00ff, #ff00aa);
+  border: none;
+  color: #fff;
+  padding: 15px 40px;
+  font-size: 1.2em;
+  font-weight: bold;
+  border-radius: 50px;
+  cursor: pointer;
+  text-transform: uppercase;
+  box-shadow: 0 5px 15px rgba(255, 0, 255, 0.4);
+  transition: all 0.3s;
+}
+
+/* Secondary button */
+.btn.secondary {
+  background: linear-gradient(145deg, #00ffff, #00aaff);
+  box-shadow: 0 5px 15px rgba(0, 255, 255, 0.4);
+}
+
+/* Glow animation */
+@keyframes glow {
+  from {
+    text-shadow: 0 0 10px #ff00ff, 0 0 20px #ff00ff;
+  }
+  to {
+    text-shadow: 0 0 20px #ff00ff, 0 0 40px #ff00ff;
+  }
+}
