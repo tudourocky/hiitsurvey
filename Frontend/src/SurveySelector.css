@@ -8,6 +8,7 @@
   overflow: hidden;
   position: relative;
   font-family: "Arial Black", sans-serif;
+  min-width: 100vh;
 }
 
 /* Scanlines overlay */
@@ -60,9 +61,10 @@
 .carousel-container {
   width: 100%;
   max-width: 900px;
-  height: 350px;
+  height: 500px;
   position: relative;
   perspective: 1000px;
+  /* overflow: hidden; */
 }
 
 /* Carousel */
@@ -96,7 +98,7 @@
 }
 
 /* Active card */
-.card.active {
+.card-active {
   width: 260px;
   height: 320px;
   margin-left: -130px;
@@ -207,4 +209,28 @@
   to {
     text-shadow: 0 0 20px #ff00ff, 0 0 40px #ff00ff;
   }
+}
+
+
+.chevron {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 4em;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 0;
+}
+
+.chevron.right {
+  right: -80px;
+  transform: rotate(-180deg);
+}
+
+.chevron.left {
+  left: -80px;
 }
