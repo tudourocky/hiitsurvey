@@ -3,13 +3,14 @@ import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
 import ArcadeSongSelector from './SurveySelector' 
+import PreferenceForm from './pages/PreferenceForm'
 
 function App() {
-  const [count, setCount] = useState(0)
 
   return (
     <>
-      < ArcadeSongSelector />
+      {/* < ArcadeSongSelector /> */}
+      <PreferenceForm />
     </>
   )
 }
