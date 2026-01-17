@@ -3,7 +3,7 @@ import httpx
 import uuid
 from typing import Dict, List
 from app.config import SURVEYMONKEY_TOKEN, SURVEYMONKEY_BASE_URL
-from app.models.survey import Survey, SurveyListResponse, SurveyQuestionDetail
+from app.models.survey import Survey, SurveyListResponse, SurveyQuestionDetail, Mission, MissionListResponse
 
 
 class SurveyService:
@@ -256,6 +256,39 @@ class SurveyService:
                     )
                 ]
             )
+
+
+    async def get_missions_async(self) -> MissionListResponse:
+        """Async version of get_missions"""
+        surveys_response = await self.get_surveys()
+        surveys = surveys_response.surveys
+        
+        # Icon and color mapping based on survey themes
+        mission_themes = [
+            {"icon": "⚡", "color": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", "artist": "Neon Pulse"},
+            {"icon": "🎮", "color": "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)", "artist": "Digital Storm"},
+            {"icon": "🌃", "color": "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)", "artist": "Synthwave City"},
+            {"icon": "✨", "color": "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)", "artist": "Beat Master"},
+            {"icon": "🎹", "color": "linear-gradient(135deg, #fa709a 0%, #fee140 100%)", "artist": "80s Kid"},
+            {"icon": "👾", "color": "linear-gradient(135deg, #30cfd0 0%, #330867 100%)", "artist": "Chip Tune"},
+            {"icon": "🔊", "color": "linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)", "artist": "Club Remix"},
+            {"icon": "⭐", "color": "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)", "artist": "Cosmic DJ"},
+        ]
+        
+        missions = []
+        for idx, survey in enumerate(surveys):
+            theme = mission_themes[idx % len(mission_themes)]
+            mission = Mission(
+                id=f"mission_{survey.id}",
+                title=survey.title,
+                artist=theme["artist"],
+                icon=theme["icon"],
+                color=theme["color"],
+                survey_id=survey.id
+            )
+            missions.append(mission)
+        
+        return MissionListResponse(missions=missions, total=len(missions))
 
 
 # Singleton instance

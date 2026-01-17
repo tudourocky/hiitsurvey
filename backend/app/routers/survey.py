@@ -1,6 +1,6 @@
 """Survey router"""
 from fastapi import APIRouter, HTTPException
-from app.models.survey import Survey, SurveyListResponse, CreateSurveyRequest
+from app.models.survey import Survey, SurveyListResponse, CreateSurveyRequest, MissionListResponse
 from app.services.survey_service import survey_service
 
 router = APIRouter()
@@ -32,6 +32,18 @@ def create_survey(request: CreateSurveyRequest):
         return survey
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating survey: {str(e)}")
+
+
+@router.get("/missions", response_model=MissionListResponse)
+async def get_missions():
+    """
+    Get missions mapped from surveys.
+    Returns missions in the format expected by the frontend.
+    """
+    try:
+        return await survey_service.get_missions_async()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching missions: {str(e)}")
 
 
 @router.get("/surveys/{survey_id}", response_model=Survey)

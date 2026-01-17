@@ -4,35 +4,54 @@ import "./SurveySelector.css"
 import ChevronSVG from '../ChevronSVG';
 import Navbar from "../components/Navbar"
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 const ArcadeSurveySelector = () => {
   const navigate = useNavigate();
-  const songs = [
-    { title: "Electric Dreams", artist: "Neon Pulse",  icon: "⚡", color: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" },
-    { title: "Cyber Rush", artist: "Digital Storm",  icon: "🎮", color: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)" },
-    { title: "Tokyo Nights", artist: "Synthwave City",  icon: "🌃", color: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)" },
-    { title: "Laser Show", artist: "Beat Master",  icon: "✨", color: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)" },
-    { title: "Retro Wave", artist: "80s Kid",  icon: "🎹", color: "linear-gradient(135deg, #fa709a 0%, #fee140 100%)" },
-    { title: "Pixel Paradise", artist: "Chip Tune",  icon: "👾", color: "linear-gradient(135deg, #30cfd0 0%, #330867 100%)" },
-    { title: "Bass Drop", artist: "Club Remix",  icon: "🔊", color: "linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)" },
-    { title: "Starlight", artist: "Cosmic DJ",  icon: "⭐", color: "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)" }
-  ];
-  
+  const [missions, setMissions] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  // Fetch missions from backend
+  useEffect(() => {
+    const fetchMissions = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/missions`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch missions');
+        }
+        const data = await response.json();
+        setMissions(data.missions || []);
+      } catch (error) {
+        console.error('Error fetching missions:', error);
+        // Fallback to empty array if API fails
+        setMissions([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMissions();
+  }, []);
+
   const navigateCarousel = (direction) => {
-    setCurrentIndex((prev) => (prev + direction + songs.length) % songs.length);
+    if (missions.length === 0) return;
+    setCurrentIndex((prev) => (prev + direction + missions.length) % missions.length);
   };
 
   const navigateTo = (index) => {
     setCurrentIndex(index);
   };
 
-  const selectSong = () => {
-    navigate('/exercise');
+  const selectMission = () => {
+    if (missions.length === 0) return;
+    const selectedMission = missions[currentIndex];
+    // Navigate to exercise page with survey_id
+    navigate(`/exercise?survey_id=${selectedMission.survey_id}`);
   };
 
   const handleCardClick = () => {
-    navigate('/exercise');
+    selectMission();
   };
 
   useEffect(() => {
@@ -41,15 +60,16 @@ const ArcadeSurveySelector = () => {
       if (e.key === 'ArrowRight') navigateCarousel(1);
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        selectSong();
+        selectMission();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentIndex]);
+  }, [currentIndex, missions]);
 
   const getCardStyle = (index) => {
-    const total = songs.length;
+    const total = missions.length;
+    if (total === 0) return {};
     let offset = index - currentIndex;
     if (offset > total / 2) offset -= total;
     if (offset < -total / 2) offset += total;
@@ -82,33 +102,39 @@ const ArcadeSurveySelector = () => {
           <h1 className="title neon-text-pink">MISSION SELECT</h1>
           <p className="subtitle">CHOOSE YOUR CHALLENGE</p>
           
-          <div className="carousel-container" onWheel={handleWheel}>
-            <button onClick={() => navigateCarousel(-1)} className="chevron left" aria-label="Previous">
-              <ChevronSVG direction="left" size={48} />
-            </button>
-            <div className="carousel">
-              {songs.map((song, index) => {
-                const isActive = index === currentIndex;
-                return (
-                  <div
-                    key={index}
-                    onClick={handleCardClick}
-                    className={`card ${isActive ? 'card-active' : ''}`}
-                    style={{ ...getCardStyle(index), cursor: 'pointer' }}
-                  >
-                    <div className={`album-art ${isActive ? 'active' : '' }`} style={{ background: song.color }}>{song.icon}</div>
-                    <div className="song-info">
-                      <div className={`song-title ${isActive ? 'active' : ''}`}>{song.title}</div>
-                      <div className="song-artist">{song.artist}</div>
+          {loading ? (
+            <div className="loading-message">LOADING MISSIONS...</div>
+          ) : missions.length === 0 ? (
+            <div className="loading-message">NO MISSIONS AVAILABLE</div>
+          ) : (
+            <div className="carousel-container" onWheel={handleWheel}>
+              <button onClick={() => navigateCarousel(-1)} className="chevron left" aria-label="Previous">
+                <ChevronSVG direction="left" size={48} />
+              </button>
+              <div className="carousel">
+                {missions.map((mission, index) => {
+                  const isActive = index === currentIndex;
+                  return (
+                    <div
+                      key={mission.id}
+                      onClick={handleCardClick}
+                      className={`card ${isActive ? 'card-active' : ''}`}
+                      style={{ ...getCardStyle(index), cursor: 'pointer' }}
+                    >
+                      <div className={`album-art ${isActive ? 'active' : '' }`} style={{ background: mission.color }}>{mission.icon}</div>
+                      <div className="song-info">
+                        <div className={`song-title ${isActive ? 'active' : ''}`}>{mission.title}</div>
+                        <div className="song-artist">{mission.artist}</div>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+              <button onClick={() => navigateCarousel(+1)} className="chevron right" aria-label="Next">
+                <ChevronSVG direction="right" size={48} />
+              </button>
             </div>
-            <button onClick={() => navigateCarousel(+1)} className="chevron right" aria-label="Next">
-              <ChevronSVG direction="right" size={48} />
-            </button>
-          </div>
+          )}
 
           <div className="controls">
           </div>
