@@ -1,7 +1,8 @@
 import React from 'react';
 
-const ChevronSVG = ({ size = 400, color = 'currentColor', direction = 'right' }) => {
+const ChevronSVG = ({ size = 24, color = 'currentColor', direction = 'right' }) => {
   // Rotate the SVG container based on direction prop
+  // The base path is a right-pointing chevron: >
   const rotation = {
     right: '0deg',
     down: '90deg',
@@ -16,13 +17,17 @@ const ChevronSVG = ({ size = 400, color = 'currentColor', direction = 'right' })
       viewBox="0 0 24 24"
       fill="none"
       stroke={color}
-      strokeWidth="2"
+      strokeWidth="3"
       strokeLinecap="round"
       strokeLinejoin="round"
-      style={{ transform: rotation[direction], transition: 'transform 0.2s linear' }}
+      style={{ 
+        transform: `rotate(${rotation[direction]})`, 
+        transition: 'transform 0.2s linear',
+        display: 'block'
+      }}
     >
-      {/* Path for a right-pointing chevron */}
-      <path d="m15 18-6-6 6-6" />
+      {/* Path for a right-pointing chevron: > */}
+      <path d="m9 18 6-6-6-6" />
     </svg>
   );
 };

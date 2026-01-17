@@ -1,0 +1,35 @@
+.arcade-navbar {
+  background: #000;
+  border-bottom: 3px solid var(--neon-pink);
+  box-shadow: 0 5px 15px rgba(255, 0, 255, 0.3);
+  padding: 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.navbar-links {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.nav-link {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 0.7rem;
+  color: var(--neon-blue);
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+  padding: 0.5rem 1rem;
+  border: 2px solid transparent;
+}
+
+.nav-link:hover {
+  color: var(--neon-pink);
+  text-shadow: 0 0 10px var(--neon-pink);
+  border: 2px solid var(--neon-pink);
+  box-shadow: 0 0 10px var(--neon-pink);
+}
