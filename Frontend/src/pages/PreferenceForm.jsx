@@ -29,7 +29,15 @@ export default function WorkoutForm() {
       
       setSubmitted(true);
     } else {
-      alert('Please fill out all fields');
+      if (!formData.workoutType){
+        document.getElementById("TypeLabel").classList.add("neon-text-red")
+      }
+      if (!formData.duration){
+        document.getElementById("DurationLabel").classList.add("neon-text-red")
+      }
+      if (!formData.intensity){
+          document.getElementById("IntensityLabel").classList.add("neon-text-red")
+      }
     }
   };
 
@@ -75,7 +83,7 @@ export default function WorkoutForm() {
         <h1 className="title">Workout Config</h1>
         
         <div className="form-group">
-          <label className="section-label neon-text-blue">SELECT BODY PART</label>
+          <label className="section-label neon-text-blue" id="TypeLabel">SELECT BODY PART</label>
           <div className="radio-grid">
             {['full', 'upper', 'lower', 'core', 'arms', 'legs'].map((type) => (
               <label
@@ -91,7 +99,7 @@ export default function WorkoutForm() {
         </div>
 
         <div className="form-group">
-          <label className="section-label neon-text-blue">DURATION</label>
+          <label className="section-label neon-text-blue" id="DurationLabel">DURATION</label>
           <select
             value={formData.duration}
             onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
@@ -106,7 +114,7 @@ export default function WorkoutForm() {
         </div>
 
         <div className="form-group">
-          <label className="section-label neon-text-blue">DIFFICULTY</label>
+          <label className="section-label neon-text-blue" id="IntensityLabel">DIFFICULTY</label>
           <div className="intensity-group">
             {[
               { value: 'low', label: 'EASY' },

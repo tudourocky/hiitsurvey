@@ -10,7 +10,7 @@ export default function Home() {
       <Navbar />
       <main className="home-content">
         <div className="hero-section">
-          <h1 className="title-large">HIT ARCADE</h1>
+          <h1 className="title-large">HIIT ARCADE</h1>
           <p className="hero-subtitle">Level up your fitness.</p>
           
           <div className="arcade-frame neon-border-blue">
