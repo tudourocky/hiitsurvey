@@ -33,11 +33,17 @@ class Exercise(BaseModel):
     equipment: Optional[str] = None
 
 
+class ExerciseMapping(BaseModel):
+    option: str  # The multiple choice option text
+    exercise: Exercise
+
+
 class WorkoutSegment(BaseModel):
     question_id: str
     question: str
     question_type: str
-    exercises: List[Exercise]  # For MC: different exercises for different answers
+    option_exercise_mapping: Optional[List[ExerciseMapping]] = None  # Explicit mapping: option -> exercise
+    exercises: List[Exercise] = []  # Keep for backwards compatibility
     is_break: bool = False  # True for short_answer questions
 
 
@@ -92,22 +98,27 @@ def mock_llm_generate_workout(preferences: WorkoutPreferences, questions: List[S
             ))
         else:
             # Multiple choice: assign different exercises to each option
-            exercises = []
+            option_mappings = []
+            exercises_list = []
             for j, option in enumerate(question.options or []):
                 exercise_name = available_exercises[exercise_index % len(available_exercises)]
-                exercises.append(Exercise(
+                exercise = Exercise(
                     name=exercise_name,
                     sets=params["sets"],
                     reps=params["reps"],
                     equipment=None  # Could map from preferences.equipment_available
-                ))
+                )
+                # Create explicit mapping: option -> exercise
+                option_mappings.append(ExerciseMapping(option=option, exercise=exercise))
+                exercises_list.append(exercise)
                 exercise_index += 1
             
             segments.append(WorkoutSegment(
                 question_id=question.id,
                 question=question.question,
                 question_type="multiple_choice",
-                exercises=exercises,
+                option_exercise_mapping=option_mappings,
+                exercises=exercises_list,  # Keep for backwards compatibility
                 is_break=False
             ))
     
