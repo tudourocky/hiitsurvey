@@ -8,7 +8,8 @@ import cv2
 from PIL import Image
 import io
 import base64
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Literal
+from pydantic import BaseModel
 import math
 import os
 import urllib.request
