@@ -42,3 +42,19 @@ class CreateSurveyRequest(BaseModel):
     """Request model for creating a survey"""
     title: str
     questions: List[SurveyQuestionDetail]
+
+
+class Mission(BaseModel):
+    """Mission model mapped from survey"""
+    id: str
+    title: str
+    artist: str
+    icon: str
+    color: str
+    survey_id: str
+
+
+class MissionListResponse(BaseModel):
+    """Response model for list of missions"""
+    missions: List[Mission]
+    total: int

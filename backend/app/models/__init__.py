@@ -6,6 +6,8 @@ from .survey import (
     SurveyListResponse,
     SurveyQuestion,
     CreateSurveyRequest,
+    Mission,
+    MissionListResponse,
 )
 from .workout import (
     WorkoutPreferences,
@@ -30,6 +32,8 @@ __all__ = [
     "SurveyListResponse",
     "SurveyQuestion",
     "CreateSurveyRequest",
+    "Mission",
+    "MissionListResponse",
     "WorkoutPreferences",
     "GenerateWorkoutRequest",
     "Exercise",
