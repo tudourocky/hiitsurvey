@@ -13,6 +13,11 @@ from pydantic import BaseModel
 import math
 import os
 import urllib.request
+import httpx
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = FastAPI()
 
@@ -499,6 +504,35 @@ class GeneratedWorkout(BaseModel):
     summary: str
 
 
+# Survey Monkey API Models
+class SurveyOption(BaseModel):
+    id: str
+    text: str
+
+
+class SurveyQuestionDetail(BaseModel):
+    id: str
+    heading: str
+    type: str  # e.g., "multiple_choice", "open_ended"
+    options: Optional[List[SurveyOption]] = None
+
+
+class Survey(BaseModel):
+    id: str
+    title: str
+    questions: List[SurveyQuestionDetail]
+
+
+class SurveyListResponse(BaseModel):
+    surveys: List[Survey]
+    total: int
+
+
+# Get Survey Monkey config from environment
+SURVEYMONKEY_TOKEN = os.getenv("SURVEYMONKEY_ACCESS_TOKEN", "")
+SURVEYMONKEY_BASE_URL = os.getenv("SURVEYMONKEY_BASE_URL", "https://api.surveymonkey.com/v3")
+
+
 def mock_llm_generate_workout(preferences: WorkoutPreferences, questions: List[SurveyQuestion]) -> GeneratedWorkout:
     """
     Mock LLM call that generates a workout based on preferences and survey questions.
@@ -708,6 +742,130 @@ def generate_workout(request: GenerateWorkoutRequest):
     """
     workout = mock_llm_generate_workout(request.preferences, request.survey_questions)
     return workout
+
+
+@app.get("/surveys", response_model=SurveyListResponse)
+async def get_surveys():
+    """
+    Fetch surveys from Survey Monkey API.
+    Currently returns mock data. Replace with real API call when ready.
+    
+    To use real API, uncomment the code below and ensure SURVEYMONKEY_ACCESS_TOKEN is set.
+    """
+    # TODO: Replace this with real API call
+    # if not SURVEYMONKEY_TOKEN:
+    #     raise HTTPException(status_code=401, detail="Survey Monkey token not configured")
+    # 
+    # async with httpx.AsyncClient() as client:
+    #     response = await client.get(
+    #         f"{SURVEYMONKEY_BASE_URL}/surveys",
+    #         headers={
+    #             "Authorization": f"Bearer {SURVEYMONKEY_TOKEN}",
+    #             "Content-Type": "application/json"
+    #         },
+    #         params={"per_page": 100}
+    #     )
+    #     response.raise_for_status()
+    #     data = response.json()
+    #     
+    #     # Fetch details for each survey (questions, etc.)
+    #     surveys = []
+    #     for survey in data.get("data", []):
+    #         details_response = await client.get(
+    #             f"{SURVEYMONKEY_BASE_URL}/surveys/{survey['id']}/details",
+    #             headers={"Authorization": f"Bearer {SURVEYMONKEY_TOKEN}"}
+    #         )
+    #         details = details_response.json()
+    #         # Transform Survey Monkey data to our format
+    #         surveys.append(transform_survey_data(details))
+    #     
+    #     return {"surveys": surveys, "total": len(surveys)}
+    
+    # Mock response for now
+    return {
+        "surveys": [
+            {
+                "id": "123456789",
+                "title": "Customer Satisfaction Survey",
+                "questions": [
+                    {
+                        "id": "q1",
+                        "heading": "How satisfied are you with our service?",
+                        "type": "multiple_choice",
+                        "options": [
+                            {"id": "opt1", "text": "Very Satisfied"},
+                            {"id": "opt2", "text": "Satisfied"},
+                            {"id": "opt3", "text": "Neutral"},
+                            {"id": "opt4", "text": "Dissatisfied"}
+                        ]
+                    },
+                    {
+                        "id": "q2",
+                        "heading": "What would you like to see improved?",
+                        "type": "open_ended",
+                        "options": None
+                    }
+                ]
+            },
+            {
+                "id": "987654321",
+                "title": "Product Feedback",
+                "questions": [
+                    {
+                        "id": "q1",
+                        "heading": "How likely are you to recommend us?",
+                        "type": "multiple_choice",
+                        "options": [
+                            {"id": "opt1", "text": "Very Likely"},
+                            {"id": "opt2", "text": "Likely"},
+                            {"id": "opt3", "text": "Unlikely"}
+                        ]
+                    }
+                ]
+            }
+        ],
+        "total": 2
+    }
+
+
+@app.get("/surveys/{survey_id}", response_model=Survey)
+async def get_survey(survey_id: str):
+    """
+    Get a specific survey by ID from Survey Monkey.
+    Currently returns mock data.
+    """
+    # TODO: Replace with real API call
+    # if not SURVEYMONKEY_TOKEN:
+    #     raise HTTPException(status_code=401, detail="Survey Monkey token not configured")
+    # 
+    # async with httpx.AsyncClient() as client:
+    #     response = await client.get(
+    #         f"{SURVEYMONKEY_BASE_URL}/surveys/{survey_id}/details",
+    #         headers={
+    #             "Authorization": f"Bearer {SURVEYMONKEY_TOKEN}",
+    #             "Content-Type": "application/json"
+    #         }
+    #     )
+    #     response.raise_for_status()
+    #     data = response.json()
+    #     return transform_survey_data(data)
+    
+    # Mock implementation
+    return {
+        "id": survey_id,
+        "title": "Sample Survey",
+        "questions": [
+            {
+                "id": "q1",
+                "heading": "Sample question?",
+                "type": "multiple_choice",
+                "options": [
+                    {"id": "opt1", "text": "Option 1"},
+                    {"id": "opt2", "text": "Option 2"}
+                ]
+            }
+        ]
+    }
 
 
 @app.get("/items/{item_id}")
