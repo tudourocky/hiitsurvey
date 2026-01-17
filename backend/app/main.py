@@ -24,4 +24,4 @@ app.add_middleware(
 app.include_router(health.router, tags=["health"])
 app.include_router(exercise.router, prefix="/api", tags=["exercise"])
 app.include_router(workout.router, prefix="/api", tags=["workout"])
-app.include_router(survey.router, prefix="/api", tags=["survey"])
+app.include_router(survey.router, tags=["survey"])  # No prefix to match frontend expectations

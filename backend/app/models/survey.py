@@ -36,3 +36,9 @@ class SurveyListResponse(BaseModel):
     """Response model for list of surveys"""
     surveys: List[Survey]
     total: int
+
+
+class CreateSurveyRequest(BaseModel):
+    """Request model for creating a survey"""
+    title: str
+    questions: List[SurveyQuestionDetail]

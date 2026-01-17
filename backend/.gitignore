@@ -4,3 +4,6 @@ venv/
 __pycache__/
 pose_landmarker.task
 *.task
+
+# Keep .env.example in version control
+!.env.example

@@ -13,5 +13,8 @@ MODEL_URL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pos
 SURVEYMONKEY_TOKEN = os.getenv("SURVEYMONKEY_ACCESS_TOKEN", "")
 SURVEYMONKEY_BASE_URL = os.getenv("SURVEYMONKEY_BASE_URL", "https://api.surveymonkey.com/v3")
 
+# OpenAI Configuration
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
 # CORS Configuration
 CORS_ORIGINS = ["*"]  # In production, specify actual origins

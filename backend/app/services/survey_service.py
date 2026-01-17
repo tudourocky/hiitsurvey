@@ -1,11 +1,17 @@
 """Survey service for SurveyMonkey API integration"""
 import httpx
+import uuid
+from typing import Dict, List
 from app.config import SURVEYMONKEY_TOKEN, SURVEYMONKEY_BASE_URL
-from app.models.survey import Survey, SurveyListResponse
+from app.models.survey import Survey, SurveyListResponse, SurveyQuestionDetail
 
 
 class SurveyService:
     """Service for interacting with SurveyMonkey API"""
+    
+    def __init__(self):
+        # In-memory store for created surveys
+        self._surveys_store: Dict[str, Survey] = {}
     
     def transform_survey_data(self, survey_data: dict) -> dict:
         """
@@ -25,6 +31,9 @@ class SurveyService:
         Fetch surveys from Survey Monkey API.
         Returns surveys in the format matching SurveyMonkey's response structure.
         """
+        # Combine stored surveys with API/mock surveys
+        all_surveys = list(self._surveys_store.values())
+        
         # Try to use real API if token is configured
         if SURVEYMONKEY_TOKEN:
             try:
@@ -43,10 +52,11 @@ class SurveyService:
                     
                     # Check if response is already in the expected format
                     if "surveys" in data and "total" in data:
-                        return SurveyListResponse(**data)
+                        api_surveys = [Survey(**s) for s in data["surveys"]]
+                        all_surveys.extend(api_surveys)
+                        return SurveyListResponse(surveys=all_surveys, total=len(all_surveys))
                     
                     # Otherwise, fetch details for each survey and transform
-                    surveys = []
                     survey_list = data.get("data", [])
                     
                     for survey in survey_list:
@@ -62,24 +72,32 @@ class SurveyService:
                             details = details_response.json()
                             # Transform Survey Monkey data to our format
                             transformed = self.transform_survey_data(details)
-                            surveys.append(Survey(**transformed))
+                            all_surveys.append(Survey(**transformed))
                         except Exception as e:
                             print(f"Error fetching details for survey {survey.get('id')}: {e}")
                             continue
                     
-                    return SurveyListResponse(surveys=surveys, total=len(surveys))
+                    return SurveyListResponse(surveys=all_surveys, total=len(all_surveys))
             except Exception as e:
                 print(f"Error fetching surveys from API: {e}")
                 # Fall through to mock data if API call fails
         
-        # Mock response matching the actual SurveyMonkey format
-        return self._get_mock_surveys()
+        # Add mock surveys if no stored surveys
+        if not all_surveys:
+            mock_surveys = self._get_mock_surveys()
+            all_surveys.extend(mock_surveys.surveys)
+        
+        return SurveyListResponse(surveys=all_surveys, total=len(all_surveys))
     
     async def get_survey(self, survey_id: str) -> Survey:
         """
         Get a specific survey by ID from Survey Monkey.
         Returns survey in the format matching SurveyMonkey's response structure.
         """
+        # Check in-memory store first
+        if survey_id in self._surveys_store:
+            return self._surveys_store[survey_id]
+        
         # Try to use real API if token is configured
         if SURVEYMONKEY_TOKEN:
             try:
@@ -106,6 +124,26 @@ class SurveyService:
         
         # Mock implementation matching the actual SurveyMonkey format
         return self._get_mock_survey(survey_id)
+    
+    def create_survey(self, title: str, questions: List[SurveyQuestionDetail]) -> Survey:
+        """
+        Create a new survey and store it in memory.
+        Returns the created survey with a generated ID.
+        """
+        # Generate a unique ID
+        survey_id = str(uuid.uuid4())
+        
+        # Create survey
+        survey = Survey(
+            id=survey_id,
+            title=title,
+            questions=questions
+        )
+        
+        # Store in memory
+        self._surveys_store[survey_id] = survey
+        
+        return survey
     
     def _get_mock_surveys(self) -> SurveyListResponse:
         """Return mock survey data"""
