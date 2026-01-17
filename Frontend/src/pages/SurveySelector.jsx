@@ -103,7 +103,10 @@ const ArcadeSurveySelector = () => {
           <p className="subtitle">CHOOSE YOUR CHALLENGE</p>
           
           {loading ? (
-            <div className="loading-message">LOADING MISSIONS...</div>
+            <div className="loading-container">
+              <div className="loading-spinner"></div>
+              <p className="loading-text neon-text-blue">LOADING MISSIONS...</p>
+            </div>
           ) : missions.length === 0 ? (
             <div className="loading-message">NO MISSIONS AVAILABLE</div>
           ) : (

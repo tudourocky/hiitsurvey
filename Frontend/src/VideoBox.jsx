@@ -21,6 +21,11 @@ const VideoBox = ({ surveyId }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [selectedExercise, setSelectedExercise] = useState(null);
+  const [currentExerciseReps, setCurrentExerciseReps] = useState(0);
+  const [previousCounters, setPreviousCounters] = useState({});
+  const [isExerciseComplete, setIsExerciseComplete] = useState(false);
+  const [loadingSurvey, setLoadingSurvey] = useState(false);
+  const [loadingWorkout, setLoadingWorkout] = useState(false);
 
   const startWebcam = async () => {
     try {
@@ -44,13 +49,179 @@ const VideoBox = ({ surveyId }) => {
     setIsActive(false);
   };
 
-  const resetCounters = () => setCounters(Object.keys(counters).reduce((acc, k) => ({ ...acc, [k]: 0 }), {}));
+  const resetCounters = async () => {
+    try {
+      await fetch(`${API_URL}/api/reset-counters`, { method: 'POST' });
+      setCounters(Object.keys(counters).reduce((acc, k) => ({ ...acc, [k]: 0 }), {}));
+      setCurrentExerciseReps(0);
+      setPreviousCounters({});
+      setIsExerciseComplete(false);
+    } catch (err) {
+      console.error('Error resetting counters:', err);
+    }
+  };
+
+  // Map exercise names from workout to backend counter keys
+  const mapExerciseNameToCounter = (exerciseName) => {
+    const nameMap = {
+      'Squats': 'squat',
+      'Jumping Jacks': 'jumping_jack',
+      'Burpees': 'burpee',
+      'Mountain Climbers': 'mountain_climber',
+      'High Knee': 'high_knee',
+      'Push-ups': 'push_up',
+      'Lunges': 'lunge',
+      'Plank': 'plank',
+      'Jump Squat': 'jump_squat',
+      'Star Jump': 'star_jump',
+      'Push-ups': 'push_up',
+      'Plank Hold': 'plank',
+      'Sit-ups': 'squat', // fallback
+      'Crunches': 'squat', // fallback
+      'Russian Twists': 'squat', // fallback
+      'Leg Raises': 'high_knee',
+      'Calf Raises': 'squat', // fallback
+      'Wall Sit': 'plank', // fallback
+      'Shoulder Press': 'push_up', // fallback
+      'Bicep Curls': 'push_up', // fallback
+      'Tricep Dips': 'push_up', // fallback
+      'Pull-ups': 'push_up', // fallback
+      'Arm Circles': 'jumping_jack', // fallback
+      'Dumbbell Thrusters': 'squat', // fallback
+      'Dumbbell Bench Press': 'push_up', // fallback
+      'Dumbbell Swings': 'jumping_jack', // fallback
+      'Dumbbell Side Bends': 'squat', // fallback
+      'Bodyweight Squats': 'squat',
+      'Dumbbell Deadlifts': 'squat', // fallback
+    };
+    
+    // Try exact match first
+    if (nameMap[exerciseName]) {
+      return nameMap[exerciseName];
+    }
+    
+    // Try case-insensitive partial match
+    const lowerName = exerciseName.toLowerCase();
+    for (const [key, value] of Object.entries(nameMap)) {
+      if (lowerName.includes(key.toLowerCase()) || key.toLowerCase().includes(lowerName)) {
+        return value;
+      }
+    }
+    
+    // Default fallback
+    return 'squat';
+  };
+
+  // Process video frames and detect exercises (throttled to ~10fps)
+  const lastFrameTime = useRef(0);
+  const processFrame = useCallback(async () => {
+    if (!isActive || !videoRef.current || !canvasRef.current) return;
+    
+    const now = Date.now();
+    // Throttle to ~10fps (100ms between frames)
+    if (now - lastFrameTime.current < 100) {
+      animationFrameRef.current = requestAnimationFrame(processFrame);
+      return;
+    }
+    lastFrameTime.current = now;
+    
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Convert canvas to blob and send to backend
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          animationFrameRef.current = requestAnimationFrame(processFrame);
+          return;
+        }
+        
+        try {
+          const formData = new FormData();
+          formData.append('file', blob, 'frame.jpg');
+          
+          const response = await fetch(`${API_URL}/api/process-frame`, {
+            method: 'POST',
+            body: formData
+          });
+          
+          if (!response.ok) {
+            animationFrameRef.current = requestAnimationFrame(processFrame);
+            return;
+          }
+          
+          const data = await response.json();
+          
+          if (data.exercises) {
+            setCounters(data.exercises);
+          }
+        } catch (err) {
+          console.error('Error processing frame:', err);
+        } finally {
+          animationFrameRef.current = requestAnimationFrame(processFrame);
+        }
+      }, 'image/jpeg', 0.8);
+    } else {
+      animationFrameRef.current = requestAnimationFrame(processFrame);
+    }
+  }, [isActive]);
+
+  // Start/stop frame processing
+  useEffect(() => {
+    if (isActive) {
+      processFrame();
+    } else {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    }
+    
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isActive, processFrame]);
+
+  // Track reps for selected exercise
+  useEffect(() => {
+    if (!selectedExercise) {
+      setCurrentExerciseReps(0);
+      setIsExerciseComplete(false);
+      return;
+    }
+
+    const counterKey = mapExerciseNameToCounter(selectedExercise.name);
+    const currentCount = counters[counterKey] || 0;
+    const previousCount = previousCounters[counterKey] !== undefined ? previousCounters[counterKey] : (counters[counterKey] || 0);
+    
+    // Calculate reps done for this exercise (since it was selected)
+    // Use max to handle counter resets
+    const repsDone = Math.max(0, currentCount - previousCount);
+    setCurrentExerciseReps(repsDone);
+    
+    // Check if required reps are met
+    const requiredReps = selectedExercise.reps || 0;
+    if (requiredReps > 0 && repsDone >= requiredReps) {
+      setIsExerciseComplete(true);
+    } else {
+      setIsExerciseComplete(false);
+    }
+  }, [counters, selectedExercise, previousCounters]);
 
   // Fetch survey when surveyId is provided
   useEffect(() => {
     if (!surveyId) return;
 
     const fetchSurvey = async () => {
+      setLoadingSurvey(true);
+      setError(null);
       try {
         const response = await fetch(`${API_URL}/surveys/${surveyId}`);
         if (!response.ok) throw new Error('Failed to fetch survey');
@@ -58,6 +229,8 @@ const VideoBox = ({ surveyId }) => {
         setSurvey(data);
       } catch (err) {
         setError('Failed to load survey: ' + err.message);
+      } finally {
+        setLoadingSurvey(false);
       }
     };
 
@@ -69,6 +242,7 @@ const VideoBox = ({ surveyId }) => {
     if (!survey || !survey.questions) return;
 
     const generateWorkout = async () => {
+      setLoadingWorkout(true);
       try {
         // Convert survey questions to workout format
         // Use empty answers so we can see all possible exercises
@@ -98,6 +272,9 @@ const VideoBox = ({ surveyId }) => {
         setWorkout(data);
       } catch (err) {
         console.error('Error generating workout:', err);
+        setError('Failed to generate workout: ' + err.message);
+      } finally {
+        setLoadingWorkout(false);
       }
     };
 
@@ -111,12 +288,16 @@ const VideoBox = ({ surveyId }) => {
     const currentQuestion = survey.questions[currentQuestionIndex];
     if (!currentQuestion || currentQuestion.type === 'open_ended') {
       setSelectedExercise(null);
+      setCurrentExerciseReps(0);
+      setIsExerciseComplete(false);
       return;
     }
 
     const answer = answers[currentQuestion.id];
     if (!answer) {
       setSelectedExercise(null);
+      setCurrentExerciseReps(0);
+      setIsExerciseComplete(false);
       return;
     }
 
@@ -124,22 +305,85 @@ const VideoBox = ({ surveyId }) => {
     const segment = workout.segments.find(s => s.question_id === currentQuestion.id);
     if (!segment || !segment.option_exercise_mapping) {
       setSelectedExercise(null);
+      setCurrentExerciseReps(0);
+      setIsExerciseComplete(false);
       return;
     }
 
     // Find the exercise for the selected answer
     const mapping = segment.option_exercise_mapping.find(m => m.option === answer);
-    setSelectedExercise(mapping ? mapping.exercise : null);
+    const newExercise = mapping ? mapping.exercise : null;
+    
+    // If exercise changed, reset tracking and capture baseline
+    if (newExercise && (!selectedExercise || newExercise.name !== selectedExercise.name)) {
+      const counterKey = mapExerciseNameToCounter(newExercise.name);
+      setPreviousCounters(prev => ({ ...prev, [counterKey]: counters[counterKey] || 0 }));
+      setCurrentExerciseReps(0);
+      setIsExerciseComplete(false);
+    }
+    
+    setSelectedExercise(newExercise);
   }, [workout, survey, currentQuestionIndex, answers]);
 
   const handleAnswer = (questionId, answer) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
+    setError(null);
+    // Exercise tracking will be reset when selectedExercise updates
   };
 
   const nextQuestion = () => {
+    const currentQuestion = survey?.questions[currentQuestionIndex];
+    
+    // Must have an answer selected
+    if (!currentQuestion || !answers[currentQuestion.id]) {
+      setError('Please select an answer first!');
+      return;
+    }
+    
+    // For multiple choice questions with exercises, must complete reps
+    if (currentQuestion.type === 'multiple_choice' && selectedExercise && selectedExercise.reps) {
+      if (!isExerciseComplete) {
+        const remaining = selectedExercise.reps - currentExerciseReps;
+        setError(`Complete ${remaining} more rep${remaining !== 1 ? 's' : ''} of ${selectedExercise.name} to continue!`);
+        return;
+      }
+    }
+    
+    // All checks passed, advance to next question
     if (survey && currentQuestionIndex < survey.questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
+      setCurrentExerciseReps(0);
+      setIsExerciseComplete(false);
+      setPreviousCounters({});
+      setError(null);
+      // Clear answer for next question
+      const nextQuestion = survey.questions[currentQuestionIndex + 1];
+      if (nextQuestion) {
+        setAnswers(prev => {
+          const newAnswers = { ...prev };
+          delete newAnswers[nextQuestion.id];
+          return newAnswers;
+        });
+      }
     }
+  };
+  
+  // Check if user can advance to next question
+  const canAdvance = () => {
+    const currentQuestion = survey?.questions[currentQuestionIndex];
+    
+    // Must have an answer
+    if (!currentQuestion || !answers[currentQuestion.id]) {
+      return false;
+    }
+    
+    // For multiple choice with exercise, must complete reps
+    if (currentQuestion.type === 'multiple_choice' && selectedExercise && selectedExercise.reps) {
+      return isExerciseComplete;
+    }
+    
+    // Open-ended questions or exercises without reps can advance
+    return true;
   };
 
   const prevQuestion = () => {
@@ -184,8 +428,27 @@ const VideoBox = ({ surveyId }) => {
             <button onClick={resetCounters} className="btn-reset">RESET SCORE</button>
           </div>
 
+          {/* Loading States */}
+          {loadingSurvey && (
+            <div className="survey-section neon-border-blue">
+              <div className="loading-container">
+                <div className="loading-spinner"></div>
+                <p className="loading-text neon-text-blue">LOADING SURVEY...</p>
+              </div>
+            </div>
+          )}
+
+          {!loadingSurvey && loadingWorkout && survey && (
+            <div className="survey-section neon-border-blue">
+              <div className="loading-container">
+                <div className="loading-spinner"></div>
+                <p className="loading-text neon-text-blue">GENERATING WORKOUT...</p>
+              </div>
+            </div>
+          )}
+
           {/* Survey Questions Section */}
-          {survey && currentQuestion && (
+          {!loadingSurvey && !loadingWorkout && survey && currentQuestion && (
             <div className="survey-section neon-border-blue">
               <div className="question-header">
                 <h3 className="neon-text-pink">QUESTION {currentQuestionIndex + 1} / {survey.questions.length}</h3>
@@ -196,11 +459,14 @@ const VideoBox = ({ surveyId }) => {
                 <div className="options-grid">
                   {currentQuestion.options.map((option) => {
                     const exercise = getExerciseForOption(option.text);
+                    const isSelected = answers[currentQuestion.id] === option.text;
+                    const isSelectedExercise = isSelected && exercise && exercise.name === selectedExercise?.name;
                     return (
                       <button
                         key={option.id}
-                        className={`option-btn ${answers[currentQuestion.id] === option.text ? 'active' : ''}`}
+                        className={`option-btn ${isSelected ? 'active' : ''} ${isSelectedExercise && !isExerciseComplete ? 'in-progress' : ''} ${isSelectedExercise && isExerciseComplete ? 'complete' : ''}`}
                         onClick={() => handleAnswer(currentQuestion.id, option.text)}
+                        disabled={isSelected && selectedExercise && !isExerciseComplete}
                       >
                         <div className="option-text">{option.text}</div>
                         {exercise && (
@@ -212,6 +478,16 @@ const VideoBox = ({ surveyId }) => {
                                 {exercise.sets && exercise.reps && ' • '}
                                 {exercise.reps && `${exercise.reps} reps`}
                               </span>
+                            )}
+                          </div>
+                        )}
+                        {isSelectedExercise && exercise && exercise.reps && (
+                          <div className="option-progress">
+                            <div className="option-reps-counter">
+                              {currentExerciseReps} / {exercise.reps} reps
+                            </div>
+                            {isExerciseComplete && (
+                              <span className="complete-check">✓</span>
                             )}
                           </div>
                         )}
@@ -234,17 +510,42 @@ const VideoBox = ({ surveyId }) => {
 
               {/* Selected Exercise Action */}
               {selectedExercise && (
-                <div className="exercise-action neon-border-pink">
+                <div className={`exercise-action neon-border-pink ${isExerciseComplete ? 'complete' : ''}`}>
                   <div className="exercise-header">
                     <span className="exercise-label">CURRENT ACTION:</span>
                     <span className="exercise-name">{selectedExercise.name}</span>
                   </div>
                   <div className="exercise-details">
                     {selectedExercise.sets && <span>Sets: {selectedExercise.sets}</span>}
-                    {selectedExercise.reps && <span>Reps: {selectedExercise.reps}</span>}
+                    {selectedExercise.reps && (
+                      <span className={isExerciseComplete ? 'complete-reps' : ''}>
+                        Reps: {currentExerciseReps} / {selectedExercise.reps}
+                      </span>
+                    )}
                     {selectedExercise.duration && <span>Duration: {selectedExercise.duration}s</span>}
                     {selectedExercise.equipment && <span>Equipment: {selectedExercise.equipment}</span>}
                   </div>
+                  {selectedExercise.reps && (
+                    <div className="reps-progress">
+                      <div className="progress-bar">
+                        <div 
+                          className="progress-fill"
+                          style={{ width: `${Math.min(100, (currentExerciseReps / selectedExercise.reps) * 100)}%` }}
+                        />
+                      </div>
+                      {isExerciseComplete && (
+                        <div className="complete-message neon-text-yellow">
+                          ✓ EXERCISE COMPLETE! YOU CAN PROCEED
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {error && (
+                <div className="error-message neon-border-yellow">
+                  {error}
                 </div>
               )}
 
@@ -252,8 +553,20 @@ const VideoBox = ({ surveyId }) => {
                 <button onClick={prevQuestion} disabled={currentQuestionIndex === 0} className="nav-btn">
                   PREV
                 </button>
-                <button onClick={nextQuestion} disabled={currentQuestionIndex === survey.questions.length - 1} className="nav-btn">
-                  NEXT
+                <button 
+                  onClick={nextQuestion} 
+                  disabled={
+                    currentQuestionIndex === survey.questions.length - 1 || 
+                    !canAdvance()
+                  } 
+                  className={`nav-btn ${!canAdvance() ? 'disabled' : ''}`}
+                  title={!canAdvance() && selectedExercise ? `Complete ${selectedExercise.reps} reps of ${selectedExercise.name}` : ''}
+                >
+                  {!canAdvance() && selectedExercise && selectedExercise.reps ? 
+                    `COMPLETE ${selectedExercise.reps} REPS` : 
+                    !canAdvance() ? 
+                    'SELECT ANSWER' : 
+                    'NEXT'}
                 </button>
               </div>
             </div>
