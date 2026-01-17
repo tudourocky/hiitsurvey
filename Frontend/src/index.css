@@ -9,8 +9,10 @@
   --neon-blue: #00ffff;
   --neon-purple: #bc13fe;
   --neon-yellow: #ffff00;
-  --bg-dark: #1a0033;
-  --bg-darker: #0d001a;
+  --glitch-red: #ff0000;
+  --glitch-cyan: #00ffff;
+  --bg-dark: #050505;
+  --bg-darker: #000000;
   
   font-family: 'Press Start 2P', system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -32,7 +34,12 @@ body {
   min-height: 100vh;
   width: 100%;
   overflow-x: hidden;
-  background: linear-gradient(135deg, var(--bg-darker) 0%, var(--bg-dark) 50%, var(--bg-darker) 100%);
+  /* Grid Background like the image */
+  background-color: var(--bg-dark);
+  background-image: 
+    linear-gradient(rgba(0, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 50px 50px;
 }
 
 #root {
@@ -41,10 +48,22 @@ body {
   flex-direction: column;
 }
 
+/* Glitch Text Effect */
+.glitch {
+  position: relative;
+  text-transform: uppercase;
+  text-shadow: 
+    2px 2px var(--glitch-red),
+    -2px -2px var(--glitch-cyan);
+}
+
 h1, h2, h3, h4 {
   text-transform: uppercase;
-  letter-spacing: 2px;
-  text-shadow: 0 0 10px var(--neon-pink), 0 0 20px var(--neon-pink);
+  letter-spacing: 4px;
+}
+
+.title-glow {
+  text-shadow: 0 0 10px var(--neon-pink), 0 0 20px var(--neon-pink), 0 0 40px var(--neon-pink);
 }
 
 a {
@@ -63,33 +82,54 @@ a:hover {
 button {
   font-family: 'Press Start 2P', cursive;
   padding: 12px 24px;
-  background: var(--bg-darker);
-  border: 3px solid var(--neon-blue);
+  background: #000;
+  border: 4px solid var(--neon-blue);
   color: var(--neon-blue);
   cursor: pointer;
   text-transform: uppercase;
-  box-shadow: 0 0 10px var(--neon-blue);
+  box-shadow: 
+    0 0 10px var(--neon-blue),
+    inset 0 0 5px var(--neon-blue);
   transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
 }
 
 button:hover {
   background: var(--neon-blue);
-  color: var(--bg-darker);
-  box-shadow: 0 0 20px var(--neon-blue);
+  color: #000;
+  box-shadow: 0 0 30px var(--neon-blue);
   transform: translateY(-2px);
 }
 
-button:active {
-  transform: translateY(0);
+button::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: rgba(255, 255, 255, 0.1);
+  transform: rotate(45deg);
+  transition: all 0.5s ease;
+  pointer-events: none;
+}
+
+button:hover::before {
+  left: 100%;
 }
 
 /* Global Arcade Utility Classes */
 .arcade-container {
-  min-height: calc(100vh - 60px); /* Adjust for navbar */
+  min-height: 100vh;
   padding: 2rem;
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
+}
+
+.scanlines {
   position: relative;
 }
 
@@ -103,32 +143,19 @@ button:active {
   background: repeating-linear-gradient(
     0deg,
     transparent,
-    transparent 2px,
-    rgba(255, 0, 255, 0.03) 2px,
-    rgba(255, 0, 255, 0.03) 4px
+    transparent 1px,
+    rgba(0, 0, 0, 0.2) 1px,
+    rgba(0, 0, 0, 0.2) 2px
   );
   pointer-events: none;
-  z-index: 9999;
+  z-index: 10000;
 }
 
-.neon-text-pink {
-  color: var(--neon-pink);
-  text-shadow: 0 0 10px var(--neon-pink);
-}
-
-.neon-text-blue {
-  color: var(--neon-blue);
-  text-shadow: 0 0 10px var(--neon-blue);
-}
-
-.neon-border-pink {
-  border: 3px solid var(--neon-pink);
-  box-shadow: 0 0 15px var(--neon-pink);
-}
-
-.neon-border-blue {
-  border: 3px solid var(--neon-blue);
-  box-shadow: 0 0 15px var(--neon-blue);
+.neon-border {
+  border: 4px solid var(--neon-pink);
+  box-shadow: 
+    0 0 15px var(--neon-pink),
+    inset 0 0 10px var(--neon-pink);
 }
 
 @keyframes scan {
@@ -136,8 +163,7 @@ button:active {
   100% { transform: translateY(50px); }
 }
 
-@keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.5; }
-  100% { opacity: 1; }
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }

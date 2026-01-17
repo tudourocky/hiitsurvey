@@ -10,27 +10,39 @@ export default function Home() {
       <Navbar />
       <main className="home-content">
         <div className="hero-section">
-          <h1 className="title-large">HIT ARCADE</h1>
-          <p className="hero-subtitle">Level up your fitness.</p>
+          <div className="retro-header">
+            <span className="retro-text">RETRO</span>
+            <div className="pacman-icon">ᗧ</div>
+            <span className="date-text">JUL 22ND</span>
+          </div>
           
-          <div className="arcade-frame neon-border-blue">
-            <div className="screen-content">
-              <h2>Insert Coin to Begin</h2>
-              <div className="button-group">
+          <h1 className="arcade-title">ARCADE</h1>
+          
+          <div className="machine-frame neon-border">
+            <div className="screen">
+              <div className="glitch-container">
+                <h2 className="glitch-text" data-text="PRESS START">PRESS START</h2>
+              </div>
+              
+              <div className="game-decoration">
+                <span className="alien">👾</span>
+                <span className="ghost">👻</span>
+              </div>
+
+              <div className="controls-hint">
                 <button 
-                  className="start-button"
+                  className="insert-coin-btn"
                   onClick={() => navigate("/surveys")}
                 >
-                  Start Workout
-                </button>
-                <button 
-                  className="settings-button"
-                  onClick={() => navigate("/preferences")}
-                >
-                  Configure
+                  INSERT COIN
                 </button>
               </div>
             </div>
+          </div>
+          
+          <div className="location-footer">
+            <p>123 ANYWHERE ST., ANY CITY</p>
+            <p className="small">FOR MORE INFORMATION, VISIT WWW.HIT-ARCADE.COM</p>
           </div>
         </div>
       </main>
@@ -42,71 +54,121 @@ export default function Home() {
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          text-align: center;
-        }
-
-        .hero-section {
-          padding: 2rem;
-        }
-
-        .title-large {
-          font-size: 4rem;
-          margin-bottom: 1rem;
-          color: #fff;
-          text-shadow: 0 0 20px var(--neon-pink), 0 0 40px var(--neon-pink), 0 0 60px var(--neon-pink);
-          animation: titleGlow 2s ease-in-out infinite alternate;
-        }
-
-        .hero-subtitle {
-          font-size: 1.2rem;
-          color: var(--neon-blue);
-          margin-bottom: 3rem;
-          letter-spacing: 4px;
-        }
-
-        .arcade-frame {
-          background: #000;
-          padding: 3rem;
-          border-radius: 20px;
-          max-width: 600px;
+          padding: 20px;
+          max-width: 800px;
           width: 100%;
         }
 
-        .screen-content h2 {
+        .retro-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          width: 100%;
+          margin-bottom: 0;
           font-size: 1.5rem;
-          color: var(--neon-yellow);
-          margin-bottom: 2rem;
-          animation: blink 1s infinite;
+          color: #fff;
         }
 
-        .button-group {
+        .pacman-icon {
+          color: var(--neon-yellow);
+          font-size: 3rem;
+          text-shadow: 0 0 15px var(--neon-yellow);
+          animation: chomp 0.5s infinite alternate;
+        }
+
+        .arcade-title {
+          font-size: 6rem;
+          margin: 0 0 2rem 0;
+          color: #fff;
+          letter-spacing: 10px;
+          text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+
+        .machine-frame {
+          background: #111;
+          padding: 10px;
+          border-radius: 5px;
+          width: 100%;
+          max-width: 600px;
+          margin-bottom: 2rem;
+        }
+
+        .screen {
+          background: #000;
+          padding: 4rem 2rem;
+          border-radius: 3px;
+          position: relative;
+          overflow: hidden;
           display: flex;
           flex-direction: column;
-          gap: 1.5rem;
+          align-items: center;
+          gap: 2rem;
         }
 
-        .start-button {
-          font-size: 1.2rem;
-          padding: 1.5rem;
-          border-color: var(--neon-pink);
-          color: var(--neon-pink);
-          box-shadow: 0 0 15px var(--neon-pink);
+        .glitch-container {
+          position: relative;
         }
 
-        .start-button:hover {
-          background: var(--neon-pink);
-          color: #000;
-          box-shadow: 0 0 30px var(--neon-pink);
+        .glitch-text {
+          font-size: 3.5rem;
+          color: #fff;
+          position: relative;
+          text-shadow: 
+            3px 0 var(--glitch-red),
+            -3px 0 var(--glitch-cyan);
+          animation: glitch-anim 2s infinite linear alternate-reverse;
         }
 
-        @keyframes titleGlow {
-          from { text-shadow: 0 0 20px var(--neon-pink), 0 0 40px var(--neon-pink); }
-          to { text-shadow: 0 0 30px var(--neon-blue), 0 0 60px var(--neon-blue); }
+        .game-decoration {
+          display: flex;
+          gap: 3rem;
+          font-size: 2.5rem;
+          margin: 1rem 0;
         }
 
-        @keyframes blink {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0; }
+        .alien { animation: float 2s infinite ease-in-out; }
+        .ghost { color: var(--neon-pink); animation: float 2s infinite ease-in-out 1s; }
+
+        .insert-coin-btn {
+          font-size: 1.5rem;
+          padding: 1.5rem 3rem;
+          border-color: var(--neon-blue);
+          animation: pulse 1.5s infinite;
+        }
+
+        .location-footer {
+          color: #fff;
+          font-size: 0.8rem;
+          line-height: 2;
+          letter-spacing: 2px;
+        }
+
+        .small {
+          font-size: 0.6rem;
+          color: var(--neon-blue);
+        }
+
+        @keyframes chomp {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(-30deg); }
+        }
+
+        @keyframes float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-15px); }
+        }
+
+        @keyframes glitch-anim {
+          0% { text-shadow: 3px 0 var(--glitch-red), -3px 0 var(--glitch-cyan); }
+          25% { text-shadow: -3px 0 var(--glitch-red), 3px 0 var(--glitch-cyan); }
+          50% { text-shadow: 3px 3px var(--glitch-red), -3px -3px var(--glitch-cyan); }
+          75% { text-shadow: -3px -3px var(--glitch-red), 3px 3px var(--glitch-cyan); }
+          100% { text-shadow: 3px 0 var(--glitch-red), -3px 0 var(--glitch-cyan); }
+        }
+
+        @media (max-width: 600px) {
+          .arcade-title { font-size: 3rem; }
+          .glitch-text { font-size: 2rem; }
         }
       `}</style>
     </div>
