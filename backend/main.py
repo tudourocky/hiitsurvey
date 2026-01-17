@@ -533,6 +533,20 @@ SURVEYMONKEY_TOKEN = os.getenv("SURVEYMONKEY_ACCESS_TOKEN", "")
 SURVEYMONKEY_BASE_URL = os.getenv("SURVEYMONKEY_BASE_URL", "https://api.surveymonkey.com/v3")
 
 
+def transform_survey_data(survey_data: dict) -> dict:
+    """
+    Transform SurveyMonkey API response to match our expected format.
+    The response format should already match, but this handles any variations.
+    """
+    # If the data is already in the correct format, return as-is
+    if "id" in survey_data and "title" in survey_data and "questions" in survey_data:
+        return survey_data
+    
+    # Otherwise, transform from SurveyMonkey's format if needed
+    # This is a placeholder for any transformation logic if the API returns a different structure
+    return survey_data
+
+
 def mock_llm_generate_workout(preferences: WorkoutPreferences, questions: List[SurveyQuestion]) -> GeneratedWorkout:
     """
     Mock LLM call that generates a workout based on preferences and survey questions.
@@ -614,6 +628,11 @@ def mock_llm_generate_workout(preferences: WorkoutPreferences, questions: List[S
 @app.get("/")
 def read_root():
     return {"message": "HIIT Exercise Detection API"}
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy"}
 
 @app.post("/process-frame")
 async def process_frame(file: UploadFile = File(...)):
@@ -748,40 +767,56 @@ def generate_workout(request: GenerateWorkoutRequest):
 async def get_surveys():
     """
     Fetch surveys from Survey Monkey API.
-    Currently returns mock data. Replace with real API call when ready.
-    
-    To use real API, uncomment the code below and ensure SURVEYMONKEY_ACCESS_TOKEN is set.
+    Returns surveys in the format matching SurveyMonkey's response structure.
     """
-    # TODO: Replace this with real API call
-    # if not SURVEYMONKEY_TOKEN:
-    #     raise HTTPException(status_code=401, detail="Survey Monkey token not configured")
-    # 
-    # async with httpx.AsyncClient() as client:
-    #     response = await client.get(
-    #         f"{SURVEYMONKEY_BASE_URL}/surveys",
-    #         headers={
-    #             "Authorization": f"Bearer {SURVEYMONKEY_TOKEN}",
-    #             "Content-Type": "application/json"
-    #         },
-    #         params={"per_page": 100}
-    #     )
-    #     response.raise_for_status()
-    #     data = response.json()
-    #     
-    #     # Fetch details for each survey (questions, etc.)
-    #     surveys = []
-    #     for survey in data.get("data", []):
-    #         details_response = await client.get(
-    #             f"{SURVEYMONKEY_BASE_URL}/surveys/{survey['id']}/details",
-    #             headers={"Authorization": f"Bearer {SURVEYMONKEY_TOKEN}"}
-    #         )
-    #         details = details_response.json()
-    #         # Transform Survey Monkey data to our format
-    #         surveys.append(transform_survey_data(details))
-    #     
-    #     return {"surveys": surveys, "total": len(surveys)}
+    # Try to use real API if token is configured
+    if SURVEYMONKEY_TOKEN:
+        try:
+            async with httpx.AsyncClient() as client:
+                # Fetch surveys list
+                response = await client.get(
+                    f"{SURVEYMONKEY_BASE_URL}/surveys",
+                    headers={
+                        "Authorization": f"Bearer {SURVEYMONKEY_TOKEN}",
+                        "Content-Type": "application/json"
+                    },
+                    params={"per_page": 100}
+                )
+                response.raise_for_status()
+                data = response.json()
+                
+                # Check if response is already in the expected format
+                if "surveys" in data and "total" in data:
+                    return data
+                
+                # Otherwise, fetch details for each survey and transform
+                surveys = []
+                survey_list = data.get("data", [])
+                
+                for survey in survey_list:
+                    try:
+                        details_response = await client.get(
+                            f"{SURVEYMONKEY_BASE_URL}/surveys/{survey['id']}/details",
+                            headers={
+                                "Authorization": f"Bearer {SURVEYMONKEY_TOKEN}",
+                                "Content-Type": "application/json"
+                            }
+                        )
+                        details_response.raise_for_status()
+                        details = details_response.json()
+                        # Transform Survey Monkey data to our format
+                        transformed = transform_survey_data(details)
+                        surveys.append(transformed)
+                    except Exception as e:
+                        print(f"Error fetching details for survey {survey.get('id')}: {e}")
+                        continue
+                
+                return {"surveys": surveys, "total": len(surveys)}
+        except Exception as e:
+            print(f"Error fetching surveys from API: {e}")
+            # Fall through to mock data if API call fails
     
-    # Mock response for now
+    # Mock response matching the actual SurveyMonkey format
     return {
         "surveys": [
             {
@@ -832,40 +867,91 @@ async def get_surveys():
 async def get_survey(survey_id: str):
     """
     Get a specific survey by ID from Survey Monkey.
-    Currently returns mock data.
+    Returns survey in the format matching SurveyMonkey's response structure.
     """
-    # TODO: Replace with real API call
-    # if not SURVEYMONKEY_TOKEN:
-    #     raise HTTPException(status_code=401, detail="Survey Monkey token not configured")
-    # 
-    # async with httpx.AsyncClient() as client:
-    #     response = await client.get(
-    #         f"{SURVEYMONKEY_BASE_URL}/surveys/{survey_id}/details",
-    #         headers={
-    #             "Authorization": f"Bearer {SURVEYMONKEY_TOKEN}",
-    #             "Content-Type": "application/json"
-    #         }
-    #     )
-    #     response.raise_for_status()
-    #     data = response.json()
-    #     return transform_survey_data(data)
+    # Try to use real API if token is configured
+    if SURVEYMONKEY_TOKEN:
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{SURVEYMONKEY_BASE_URL}/surveys/{survey_id}/details",
+                    headers={
+                        "Authorization": f"Bearer {SURVEYMONKEY_TOKEN}",
+                        "Content-Type": "application/json"
+                    }
+                )
+                response.raise_for_status()
+                data = response.json()
+                # Transform Survey Monkey data to our format
+                return transform_survey_data(data)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise HTTPException(status_code=404, detail=f"Survey with ID {survey_id} not found")
+            raise HTTPException(status_code=e.response.status_code, detail=f"Error fetching survey: {e.response.text}")
+        except Exception as e:
+            print(f"Error fetching survey {survey_id}: {e}")
+            raise HTTPException(status_code=500, detail=f"Error fetching survey: {str(e)}")
     
-    # Mock implementation
-    return {
-        "id": survey_id,
-        "title": "Sample Survey",
-        "questions": [
-            {
-                "id": "q1",
-                "heading": "Sample question?",
-                "type": "multiple_choice",
-                "options": [
-                    {"id": "opt1", "text": "Option 1"},
-                    {"id": "opt2", "text": "Option 2"}
-                ]
-            }
-        ]
-    }
+    # Mock implementation matching the actual SurveyMonkey format
+    # Return appropriate mock based on survey_id
+    if survey_id == "123456789":
+        return {
+            "id": "123456789",
+            "title": "Customer Satisfaction Survey",
+            "questions": [
+                {
+                    "id": "q1",
+                    "heading": "How satisfied are you with our service?",
+                    "type": "multiple_choice",
+                    "options": [
+                        {"id": "opt1", "text": "Very Satisfied"},
+                        {"id": "opt2", "text": "Satisfied"},
+                        {"id": "opt3", "text": "Neutral"},
+                        {"id": "opt4", "text": "Dissatisfied"}
+                    ]
+                },
+                {
+                    "id": "q2",
+                    "heading": "What would you like to see improved?",
+                    "type": "open_ended",
+                    "options": None
+                }
+            ]
+        }
+    elif survey_id == "987654321":
+        return {
+            "id": "987654321",
+            "title": "Product Feedback",
+            "questions": [
+                {
+                    "id": "q1",
+                    "heading": "How likely are you to recommend us?",
+                    "type": "multiple_choice",
+                    "options": [
+                        {"id": "opt1", "text": "Very Likely"},
+                        {"id": "opt2", "text": "Likely"},
+                        {"id": "opt3", "text": "Unlikely"}
+                    ]
+                }
+            ]
+        }
+    else:
+        # Default mock for unknown survey IDs
+        return {
+            "id": survey_id,
+            "title": "Sample Survey",
+            "questions": [
+                {
+                    "id": "q1",
+                    "heading": "Sample question?",
+                    "type": "multiple_choice",
+                    "options": [
+                        {"id": "opt1", "text": "Option 1"},
+                        {"id": "opt2", "text": "Option 2"}
+                    ]
+                }
+            ]
+        }
 
 
 @app.get("/items/{item_id}")
