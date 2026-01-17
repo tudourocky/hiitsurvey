@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Workout from './Workout';
 import RewardDisplay from './RewardDisplay';
+import StickerClipboard from './StickerClipboard';
 import { useReward } from '../contexts/RewardContext';
 import './WorkoutSelector.css';
 
@@ -41,19 +42,7 @@ export default function WorkoutSelector() {
   return (
     <div className="workout-selector-content">
       <RewardDisplay />
-      
-      <div className="arcade-frame neon-border-pink">
-        <h2 className="title neon-text-blue">MISSION SELECT</h2>
-        <div className="workout-grid">
-          {SAMPLE_WORKOUTS.map(workout => (
-            <div key={workout.id} className="workout-card neon-border-blue">
-              <h3 className="neon-text-pink">{workout.title.toUpperCase()}</h3>
-              <p>{workout.description}</p>
-              <button onClick={() => setSelectedWorkout(workout)}>SELECT</button>
-            </div>
-          ))}
-        </div>
-      </div>
+      <StickerClipboard />
     </div>
   );
 }
