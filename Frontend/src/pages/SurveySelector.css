@@ -95,9 +95,19 @@
 .chevron.left { left: -20px; }
 .chevron.right { right: -20px; }
 
+.screen-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
 .controls {
   display: flex;
+  justify-content: center;
   gap: 1.5rem;
+  width: 100%;
 }
 
 .controls .btn {

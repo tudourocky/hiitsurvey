@@ -41,8 +41,8 @@ export default function Home() {
           </div>
           
           <div className="location-footer">
-            <p>123 ANYWHERE ST., ANY CITY</p>
-            <p className="small">FOR MORE INFORMATION, VISIT WWW.HIT-ARCADE.COM</p>
+            <p>University of Ottawa, Ottawa, ON</p>
+            <p className="small">EXCERSIZE WHILE COMPLETING SURVEYS</p>
           </div>
         </div>
       </main>
