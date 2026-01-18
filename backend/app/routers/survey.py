@@ -21,6 +21,19 @@ async def get_surveys():
         raise HTTPException(status_code=500, detail=f"Error fetching surveys: {str(e)}")
 
 
+@router.get("/surveys/v2", response_model=SurveyListResponse)
+async def get_surveys_v2():
+    """
+    Fetch surveys directly from Survey Monkey API with no cache.
+    Bypasses MongoDB and in-memory cache, always fetches fresh data from SurveyMonkey.
+    Returns surveys in the format matching SurveyMonkey's response structure.
+    """
+    try:
+        return await survey_service.get_surveys_v2()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching surveys: {str(e)}")
+
+
 @router.post("/surveys", response_model=Survey, status_code=201)
 async def create_survey(request: CreateSurveyRequest):
     """
