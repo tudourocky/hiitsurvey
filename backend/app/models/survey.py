@@ -30,6 +30,7 @@ class Survey(BaseModel):
     id: str
     title: str
     questions: List[SurveyQuestionDetail]
+    icon: Optional[str] = None  # Cached icon generated from OpenAI
 
 
 class SurveyListResponse(BaseModel):

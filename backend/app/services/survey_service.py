@@ -112,6 +112,7 @@ class SurveyService:
                 doc.pop("created_at", None)
                 doc.pop("updated_at", None)
                 doc.pop("source", None)
+                # Icon field is included in the doc if it exists in MongoDB
                 try:
                     surveys.append(Survey(**doc))
                 except Exception as e:
@@ -697,6 +698,19 @@ Icon Name:"""
         ]
         return colors[idx % len(colors)]
     
+    async def _cache_icon_in_mongodb(self, survey_id: str, icon: str):
+        """Cache icon in MongoDB for a survey"""
+        try:
+            collection = get_surveys_collection()
+            if collection is None:
+                return  # MongoDB not available
+            await collection.update_one(
+                {"id": survey_id},
+                {"$set": {"icon": icon, "updated_at": datetime.utcnow()}}
+            )
+        except Exception as e:
+            print(f"⚠ Error caching icon in MongoDB for survey {survey_id}: {e}")
+    
     async def get_missions_async(self) -> MissionListResponse:
         """Async version of get_missions"""
         surveys_response = await self.get_surveys()
@@ -704,12 +718,22 @@ Icon Name:"""
         
         missions = []
         for idx, survey in enumerate(surveys):
-            try:
-                # Generate icon using LLM (with fallback on error)
-                icon = self._generate_icon_for_survey(survey)
-            except Exception as e:
-                print(f"Error generating icon for survey {survey.id}: {e}")
-                icon = "FaCircle"  # Fallback icon
+            # Check if icon already exists in MongoDB (cached)
+            icon = survey.icon if survey.icon else None
+            
+            # If icon doesn't exist, generate it and cache it
+            if not icon:
+                try:
+                    # Generate icon using LLM (with fallback on error)
+                    icon = self._generate_icon_for_survey(survey)
+                    # Cache the icon in MongoDB for future use
+                    await self._cache_icon_in_mongodb(survey.id, icon)
+                    print(f"✓ Generated and cached icon for survey {survey.id}: {icon}")
+                except Exception as e:
+                    print(f"Error generating icon for survey {survey.id}: {e}")
+                    icon = "FaCircle"  # Fallback icon
+            else:
+                print(f"✓ Using cached icon for survey {survey.id}: {icon}")
             
             mission = Mission(
                 id=f"mission_{survey.id}",
