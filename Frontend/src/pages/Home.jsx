@@ -9,14 +9,6 @@ export default function Home() {
     const date = new Date();
 
 // Listen for future sign-ins
-useEffect(()=> {
-    
-
-    if (role){
-        // Fetch user
-        insertUser(role);
-    
-    }}, [])
 
   return (
     <div className="arcade-container scanlines">
