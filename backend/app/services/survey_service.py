@@ -124,81 +124,98 @@ class SurveyService:
     
     async def get_surveys(self) -> SurveyListResponse:
         """
-        Fetch surveys from Survey Monkey API.
+        Fetch surveys from MongoDB first. If MongoDB is empty, fetch from SurveyMonkey API and save to MongoDB.
         Returns surveys in the format matching SurveyMonkey's response structure.
         """
-        # First, try to get surveys from MongoDB
+        # First, check if MongoDB has any surveys
         mongodb_surveys = await self._get_surveys_from_mongodb()
-        all_surveys = mongodb_surveys.copy()
         
-        # Also include in-memory stored surveys
-        all_surveys.extend(list(self._surveys_store.values()))
+        # If MongoDB has surveys, return those (don't hit API)
+        if mongodb_surveys:
+            print(f"Found {len(mongodb_surveys)} surveys in MongoDB - returning cached data")
+            # Also include in-memory stored surveys (if any)
+            all_surveys = mongodb_surveys.copy()
+            all_surveys.extend(list(self._surveys_store.values()))
+            
+            # Remove duplicates based on survey ID
+            seen_ids = set()
+            unique_surveys = []
+            for survey in all_surveys:
+                if survey.id not in seen_ids:
+                    seen_ids.add(survey.id)
+                    unique_surveys.append(survey)
+            
+            return SurveyListResponse(surveys=unique_surveys, total=len(unique_surveys))
         
-        # Try to use real API if token is configured
-        if SURVEYMONKEY_TOKEN:
-            try:
-                async with httpx.AsyncClient() as client:
-                    # Fetch surveys list
-                    response = await client.get(
-                        f"{SURVEYMONKEY_BASE_URL}/surveys",
-                        headers={
-                            "Authorization": f"Bearer {SURVEYMONKEY_TOKEN}",
-                            "Content-Type": "application/json"
-                        },
-                        params={"per_page": 100}
-                    )
-                    response.raise_for_status()
-                    data = response.json()
-                    
-                    # Check if response is already in the expected format
-                    if "surveys" in data and "total" in data:
-                        api_surveys = [Survey(**s) for s in data["surveys"]]
-                        all_surveys.extend(api_surveys)
-                        return SurveyListResponse(surveys=all_surveys, total=len(all_surveys))
-                    
-                    # Otherwise, fetch details for each survey and transform
-                    survey_list = data.get("data", [])
-                    
-                    for survey in survey_list:
-                        try:
-                            details_response = await client.get(
-                                f"{SURVEYMONKEY_BASE_URL}/surveys/{survey['id']}/details",
-                                headers={
-                                    "Authorization": f"Bearer {SURVEYMONKEY_TOKEN}",
-                                    "Content-Type": "application/json"
-                                }
-                            )
-                            details_response.raise_for_status()
-                            details = details_response.json()
-                            # Transform Survey Monkey data to our format
-                            transformed = self.transform_survey_data(details)
-                            survey_obj = Survey(**transformed)
-                            # Save to MongoDB
-                            await self._save_survey_to_mongodb(survey_obj)
-                            all_surveys.append(survey_obj)
-                        except Exception as e:
-                            print(f"Error fetching details for survey {survey.get('id')}: {e}")
-                            continue
-                    
-                    # Remove duplicates based on survey ID
-                    seen_ids = set()
-                    unique_surveys = []
-                    for survey in all_surveys:
-                        if survey.id not in seen_ids:
-                            seen_ids.add(survey.id)
-                            unique_surveys.append(survey)
-                    
-                    return SurveyListResponse(surveys=unique_surveys, total=len(unique_surveys))
-            except Exception as e:
-                print(f"Error fetching surveys from API: {e}")
-                # Fall through to mock data if API call fails
+        # MongoDB is empty, fetch from SurveyMonkey API
+        print("MongoDB is empty - fetching surveys from SurveyMonkey API...")
         
-        # Add mock surveys if no stored surveys
-        if not all_surveys:
-            mock_surveys = self._get_mock_surveys()
-            all_surveys.extend(mock_surveys.surveys)
+        if not SURVEYMONKEY_TOKEN:
+            raise ValueError("No surveys found in MongoDB and SURVEYMONKEY_ACCESS_TOKEN is not configured. Please configure the token to fetch surveys from SurveyMonkey.")
         
-        return SurveyListResponse(surveys=all_surveys, total=len(all_surveys))
+        try:
+            async with httpx.AsyncClient() as client:
+                # Fetch surveys list
+                response = await client.get(
+                    f"{SURVEYMONKEY_BASE_URL}/surveys",
+                    headers={
+                        "Authorization": f"Bearer {SURVEYMONKEY_TOKEN}",
+                        "Content-Type": "application/json"
+                    },
+                    params={"per_page": 100}
+                )
+                response.raise_for_status()
+                data = response.json()
+                
+                # Check if response is already in the expected format
+                if "surveys" in data and "total" in data:
+                    api_surveys = [Survey(**s) for s in data["surveys"]]
+                    # Save each survey to MongoDB
+                    for survey in api_surveys:
+                        await self._save_survey_to_mongodb(survey)
+                    return SurveyListResponse(surveys=api_surveys, total=len(api_surveys))
+                
+                # Otherwise, fetch details for each survey and transform
+                survey_list = data.get("data", [])
+                all_surveys = []
+                
+                for survey in survey_list:
+                    try:
+                        details_response = await client.get(
+                            f"{SURVEYMONKEY_BASE_URL}/surveys/{survey['id']}/details",
+                            headers={
+                                "Authorization": f"Bearer {SURVEYMONKEY_TOKEN}",
+                                "Content-Type": "application/json"
+                            }
+                        )
+                        details_response.raise_for_status()
+                        details = details_response.json()
+                        # Transform Survey Monkey data to our format
+                        transformed = self.transform_survey_data(details)
+                        survey_obj = Survey(**transformed)
+                        # Save to MongoDB
+                        await self._save_survey_to_mongodb(survey_obj)
+                        all_surveys.append(survey_obj)
+                    except Exception as e:
+                        print(f"Error fetching details for survey {survey.get('id')}: {e}")
+                        continue
+                
+                # Also include in-memory stored surveys (if any)
+                all_surveys.extend(list(self._surveys_store.values()))
+                
+                # Remove duplicates based on survey ID
+                seen_ids = set()
+                unique_surveys = []
+                for survey in all_surveys:
+                    if survey.id not in seen_ids:
+                        seen_ids.add(survey.id)
+                        unique_surveys.append(survey)
+                
+                print(f"Fetched {len(unique_surveys)} surveys from SurveyMonkey and saved to MongoDB")
+                return SurveyListResponse(surveys=unique_surveys, total=len(unique_surveys))
+        except Exception as e:
+            print(f"Error fetching surveys from SurveyMonkey API: {e}")
+            raise ValueError(f"Failed to fetch surveys from SurveyMonkey API: {str(e)}. Please check your SURVEYMONKEY_ACCESS_TOKEN.")
     
     async def get_survey(self, survey_id: str) -> Survey:
         """
@@ -250,8 +267,8 @@ class SurveyService:
                 print(f"Error fetching survey {survey_id}: {e}")
                 raise ValueError(f"Error fetching survey: {str(e)}")
         
-        # Mock implementation matching the actual SurveyMonkey format
-        return self._get_mock_survey(survey_id)
+        # If no token configured and survey not in cache, raise error
+        raise ValueError(f"Survey with ID {survey_id} not found. Please configure SURVEYMONKEY_ACCESS_TOKEN to fetch from SurveyMonkey, or ensure the survey exists in MongoDB.")
     
     async def create_survey(self, title: str, questions: List[SurveyQuestionDetail]) -> Survey:
         """
@@ -687,8 +704,12 @@ Icon Name:"""
         
         missions = []
         for idx, survey in enumerate(surveys):
-            # Generate icon using LLM
-            icon = self._generate_icon_for_survey(survey)
+            try:
+                # Generate icon using LLM (with fallback on error)
+                icon = self._generate_icon_for_survey(survey)
+            except Exception as e:
+                print(f"Error generating icon for survey {survey.id}: {e}")
+                icon = "FaCircle"  # Fallback icon
             
             mission = Mission(
                 id=f"mission_{survey.id}",
