@@ -54,15 +54,19 @@ export const checkLoggedIn = async () => {
   }
 }
 export const insertUser = async(role) =>{
-    const {user} = await client.auth.getUser();
-    console.log(user);
-    const { data, error: insertError } = await client
-        .from('Roles')
-        .insert({
-             uid: user.uid,
-             role: role
-            })
-        .select()
+    const { data, error } = await client.auth.getUser();
+    if (error) throw error;
+    if (!data?.user) throw new Error("Not logged in");
+
+    const { error: insertError } = await client
+      .from('Roles')
+      .insert({
+        uid: data.user.id,
+        role: role
+      })
+      .select();
+
+    if (insertError) throw insertError;
 }
 
 export const extractSurveys = async() => {
@@ -103,10 +107,14 @@ export const goDown = async(ids) => {
 }
 
 export const updateLeaderBoard = async() => { 
-  const {user} = await client.auth.getUser();
+  const { data: authData, error: authError } = await client.auth.getUser();
+  if (authError) throw authError;
+  if (!authData?.user) {
+    return { ok: false, reason: "not_logged_in" };
+  }
 
-  if (!user) return ;
+  const { data, error } = await client.rpc("increment_user_score");
+  if (error) throw error;
 
-  const {data, error} = await client.rpc("increment_user_score");
-  
+  return { ok: true, data };
 }
