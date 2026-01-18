@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { signInWithGoogle } from '../shared/supabase';
 
 export default function SignIn() {
-
   return (
     <div className="arcade-container">
       <div className="signin-card">
@@ -17,7 +16,7 @@ export default function SignIn() {
           <button
             className={`toggle-btn`}
             onClick={() => {
-                signInWithGoogle('surveyor'); 
+                window.location.href=`http://localhost:5173/surveys/?role="surveyor"`
             } }
           >
             <svg className="toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">

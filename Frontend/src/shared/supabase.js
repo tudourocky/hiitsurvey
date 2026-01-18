@@ -64,3 +64,40 @@ export const insertUser = async(role) =>{
             })
         .select()
 }
+
+export const extractSurveys = async() => {
+  const {data} = await client
+    .from('Surveyor')
+    .select("*")
+
+  return data;
+
+}
+
+export const goLive = async(ids) => {
+  const { error } = await client
+    .from('Surveyor')
+    .update(
+      {live: true },  // set live = true
+    )
+    .in('id', ids) 
+
+  const {data} = await client
+    .from("Surveyor")
+    .select("*")
+  return data;
+}
+export const goDown = async(ids) => {
+  const {error} = await client
+  .from('Surveyor')
+  .update({
+    live: false
+  })
+  .in('id', ids)
+
+  const {data} = await client
+    .from("Surveyor")
+    .select("*")
+  return data;
+
+}

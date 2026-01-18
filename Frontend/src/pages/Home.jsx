@@ -10,8 +10,7 @@ export default function Home() {
 
 // Listen for future sign-ins
 useEffect(()=> {
-    const params = new URLSearchParams(window.location.search);
-    const role = params.get('role');
+    
 
     if (role){
         // Fetch user
