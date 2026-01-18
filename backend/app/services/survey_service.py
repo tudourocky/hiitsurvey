@@ -2,9 +2,11 @@
 import httpx
 import uuid
 from typing import Dict, List, Optional
+from datetime import datetime
 from openai import OpenAI
 from app.config import SURVEYMONKEY_TOKEN, SURVEYMONKEY_BASE_URL, OPENAI_API_KEY
 from app.models.survey import Survey, SurveyListResponse, SurveyQuestionDetail, Mission, MissionListResponse
+from app.utils.database import get_surveys_collection
 
 
 class SurveyService:
@@ -74,13 +76,63 @@ class SurveyService:
         
         return transformed
     
+    async def _save_survey_to_mongodb(self, survey: Survey):
+        """Save survey to MongoDB"""
+        try:
+            collection = get_surveys_collection()
+            if collection is None:
+                return  # MongoDB not available, skip silently
+            survey_dict = survey.model_dump()
+            survey_dict["created_at"] = datetime.utcnow()
+            survey_dict["updated_at"] = datetime.utcnow()
+            survey_dict["source"] = "surveymonkey"
+            
+            # Use upsert to update if exists, insert if not
+            await collection.update_one(
+                {"id": survey.id},
+                {"$set": survey_dict},
+                upsert=True
+            )
+            print(f"✓ Saved survey {survey.id} to MongoDB")
+        except Exception as e:
+            print(f"⚠ Error saving survey to MongoDB: {e}")
+            # Don't raise - allow the function to continue even if MongoDB save fails
+    
+    async def _get_surveys_from_mongodb(self) -> List[Survey]:
+        """Get all surveys from MongoDB"""
+        try:
+            collection = get_surveys_collection()
+            if collection is None:
+                return []  # MongoDB not available
+            cursor = collection.find({})
+            surveys = []
+            async for doc in cursor:
+                # Remove MongoDB _id field and convert to Survey
+                doc.pop("_id", None)
+                doc.pop("created_at", None)
+                doc.pop("updated_at", None)
+                doc.pop("source", None)
+                try:
+                    surveys.append(Survey(**doc))
+                except Exception as e:
+                    print(f"⚠ Error parsing survey from MongoDB: {e}")
+                    continue
+            return surveys
+        except Exception as e:
+            print(f"⚠ Error fetching surveys from MongoDB: {e}")
+            return []
+    
     async def get_surveys(self) -> SurveyListResponse:
         """
         Fetch surveys from Survey Monkey API.
         Returns surveys in the format matching SurveyMonkey's response structure.
         """
-        # Combine stored surveys with API/mock surveys
-        all_surveys = list(self._surveys_store.values())
+        # First, try to get surveys from MongoDB
+        mongodb_surveys = await self._get_surveys_from_mongodb()
+        all_surveys = mongodb_surveys.copy()
+        
+        # Also include in-memory stored surveys
+        all_surveys.extend(list(self._surveys_store.values()))
         
         # Try to use real API if token is configured
         if SURVEYMONKEY_TOKEN:
@@ -120,12 +172,23 @@ class SurveyService:
                             details = details_response.json()
                             # Transform Survey Monkey data to our format
                             transformed = self.transform_survey_data(details)
-                            all_surveys.append(Survey(**transformed))
+                            survey_obj = Survey(**transformed)
+                            # Save to MongoDB
+                            await self._save_survey_to_mongodb(survey_obj)
+                            all_surveys.append(survey_obj)
                         except Exception as e:
                             print(f"Error fetching details for survey {survey.get('id')}: {e}")
                             continue
                     
-                    return SurveyListResponse(surveys=all_surveys, total=len(all_surveys))
+                    # Remove duplicates based on survey ID
+                    seen_ids = set()
+                    unique_surveys = []
+                    for survey in all_surveys:
+                        if survey.id not in seen_ids:
+                            seen_ids.add(survey.id)
+                            unique_surveys.append(survey)
+                    
+                    return SurveyListResponse(surveys=unique_surveys, total=len(unique_surveys))
             except Exception as e:
                 print(f"Error fetching surveys from API: {e}")
                 # Fall through to mock data if API call fails
@@ -142,7 +205,21 @@ class SurveyService:
         Get a specific survey by ID from Survey Monkey.
         Returns survey in the format matching SurveyMonkey's response structure.
         """
-        # Check in-memory store first
+        # Check MongoDB first
+        try:
+            collection = get_surveys_collection()
+            if collection is not None:
+                doc = await collection.find_one({"id": survey_id})
+                if doc:
+                    doc.pop("_id", None)
+                    doc.pop("created_at", None)
+                    doc.pop("updated_at", None)
+                    doc.pop("source", None)
+                    return Survey(**doc)
+        except Exception as e:
+            print(f"⚠ Error fetching survey from MongoDB: {e}")
+        
+        # Check in-memory store
         if survey_id in self._surveys_store:
             return self._surveys_store[survey_id]
         
@@ -161,7 +238,10 @@ class SurveyService:
                     data = response.json()
                     # Transform Survey Monkey data to our format
                     transformed = self.transform_survey_data(data)
-                    return Survey(**transformed)
+                    survey_obj = Survey(**transformed)
+                    # Save to MongoDB
+                    await self._save_survey_to_mongodb(survey_obj)
+                    return survey_obj
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 404:
                     raise ValueError(f"Survey with ID {survey_id} not found")
@@ -173,7 +253,7 @@ class SurveyService:
         # Mock implementation matching the actual SurveyMonkey format
         return self._get_mock_survey(survey_id)
     
-    def create_survey(self, title: str, questions: List[SurveyQuestionDetail]) -> Survey:
+    async def create_survey(self, title: str, questions: List[SurveyQuestionDetail]) -> Survey:
         """
         Create a new survey in SurveyMonkey (if token available) or store in memory.
         Returns the created survey with a generated ID.
@@ -184,6 +264,8 @@ class SurveyService:
                 print(f"Attempting to create survey '{title}' in SurveyMonkey...")
                 survey = self._create_survey_in_surveymonkey(title, questions)
                 print(f"✓ Successfully created survey in SurveyMonkey: {survey.id}")
+                # Save to MongoDB
+                await self._save_survey_to_mongodb(survey)
                 return survey
             except httpx.HTTPStatusError as e:
                 print(f"✗ HTTP Error creating survey in SurveyMonkey: {e.response.status_code}")
@@ -203,7 +285,7 @@ class SurveyService:
         else:
             print(f"⚠ No SURVEYMONKEY_ACCESS_TOKEN configured. Storing survey '{title}' in memory only (temporary, lost on restart).")
         
-        # Fallback: Store in memory
+        # Fallback: Store in memory and MongoDB
         survey_id = str(uuid.uuid4())
         survey = Survey(
             id=survey_id,
@@ -211,6 +293,8 @@ class SurveyService:
             questions=questions
         )
         self._surveys_store[survey_id] = survey
+        # Save to MongoDB
+        await self._save_survey_to_mongodb(survey)
         print(f"  Stored survey locally with ID: {survey_id}")
         return survey
     

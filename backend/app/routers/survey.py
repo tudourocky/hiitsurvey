@@ -19,14 +19,14 @@ async def get_surveys():
 
 
 @router.post("/surveys", response_model=Survey, status_code=201)
-def create_survey(request: CreateSurveyRequest):
+async def create_survey(request: CreateSurveyRequest):
     """
     Create a new survey.
     If SURVEYMONKEY_TOKEN is configured, creates the survey in SurveyMonkey (persistent).
-    Otherwise, stores in memory (temporary, lost on server restart).
+    Otherwise, stores in memory and MongoDB (persistent).
     """
     try:
-        survey = survey_service.create_survey(
+        survey = await survey_service.create_survey(
             title=request.title,
             questions=request.questions
         )
