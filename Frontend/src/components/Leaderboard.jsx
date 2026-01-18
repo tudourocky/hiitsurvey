@@ -51,11 +51,9 @@ export default function Leaderboard() {
       <div className="leaderboard-container">
         <div className="leaderboard-card">
           <div className="error-state">
-            <svg className="error-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p>Error loading leaderboard</p>
-            <button onClick={fetchLeaderboard} className="retry-btn">Try Again</button>
+            <p className="neon-text-red">ERROR: SYSTEM FAILURE</p>
+            <p className="small-text">UNABLE TO RETRIEVE DATA</p>
+            <button onClick={fetchLeaderboard} className="retry-btn">REBOOT</button>
           </div>
         </div>
       </div>
@@ -66,12 +64,10 @@ export default function Leaderboard() {
     <div className="leaderboard-container">
       <div className="leaderboard-card">
         <div className="leaderboard-header">
-          <h1 className="leaderboard-title">
-            <svg className="trophy-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            </svg>
-            Leaderboard
+          <h1 className="leaderboard-title glitch" data-text="LEADERBOARD">
+            LEADERBOARD
           </h1>
-          <p className="leaderboard-subtitle">Top performers this month</p>
+          <p className="leaderboard-subtitle">TOP PERFORMERS</p>
         </div>
 
     
@@ -93,7 +89,7 @@ export default function Leaderboard() {
               >
                 <div className="table-cell rank-col">
                     <div className="rank-number">
-                        {index}
+                        {index + 1}
                     </div>
                 </div>
                 <div className="table-cell name-col">
@@ -121,10 +117,8 @@ export default function Leaderboard() {
 
         {leaderboardData.length === 0 && (
           <div className="empty-state">
-            <svg className="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-            </svg>
-            <p>No users on the leaderboard yet</p>
+            <p>NO DATA FOUND</p>
+            <p className="small-text">BE THE FIRST TO JOIN!</p>
           </div>
         )}
       </div>

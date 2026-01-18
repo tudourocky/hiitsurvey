@@ -56,7 +56,7 @@ useEffect(()=> {
           
           <div className="location-footer">
             <p>University of Ottawa, Ottawa, ON</p>
-            <p className="small">EXCERSIZE WHILE COMPLETING SURVEYS</p>
+            <p className="small">EXERCISE WHILE COMPLETING SURVEYS</p>
           </div>
         </div>
       </main>

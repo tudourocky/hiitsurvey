@@ -13,7 +13,6 @@ export default function Navbar() {
         <Link to="/surveys" className="nav-link">Surveys</Link>
         <Link to="/preferences" className="nav-link">Workout Settings</Link>
         <Link to="/rewards" className="nav-link">Rewards</Link>
-        <Link to="/exercise" className="nav-link">Go!</Link>
         { user.data.user ? 
           <Link to="/" className="nav-link" onClick={signOut}>Log Out</Link>: 
           <Link to="/signin" className="nav-link" reloadDocument>Log In</Link>

@@ -128,7 +128,6 @@ const ArcadeSurveySelector = () => {
     <div className="arcade-container scanlines">
       <Navbar />
       <div className="container">
-        <Leaderboard />
       <div className="arcade-frame neon-border-blue">
         <div className="screen-content">
           <h1 className="title neon-text-pink">MISSION SELECT</h1>
@@ -177,6 +176,7 @@ const ArcadeSurveySelector = () => {
             </div>
           </div>
         </div>
+        <Leaderboard />
         </div>
     </div>
   );
