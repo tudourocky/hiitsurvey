@@ -47,7 +47,7 @@ const Workout = ({ workout, onComplete, onCancel }) => {
         <div className="answer-area">
           {q.type === 'multiple-choice' ? (
             <div className="options-grid">
-              {q.options.map(opt => (
+              {q.options.slice(0, 4).map(opt => (
                 <button 
                   key={opt}
                   className={answers[q.id] === opt ? 'active' : ''}

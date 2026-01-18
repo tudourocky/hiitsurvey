@@ -469,7 +469,7 @@ const VideoBox = ({ surveyId }) => {
           id: q.id,
           question: q.heading,
           type: q.type === 'open_ended' ? 'short_answer' : 'multiple_choice',
-          options: q.options ? q.options.map(opt => opt.text) : null
+          options: q.options ? q.options.slice(0, 4).map(opt => opt.text) : null
         }));
 
         const response = await fetch(`${API_URL}/api/generate-workout`, {
@@ -758,7 +758,7 @@ const VideoBox = ({ surveyId }) => {
 
               {currentQuestion.type === 'multiple_choice' && currentQuestion.options && (
                 <div className="options-grid">
-                  {currentQuestion.options.map((option) => {
+                  {currentQuestion.options.slice(0, 4).map((option) => {
                     const exercise = getExerciseForOption(option.text);
                     const isSelected = answers[currentQuestion.id] === option.text;
                     const isSelectedExercise = isSelected && exercise && exercise.name === selectedExercise?.name;

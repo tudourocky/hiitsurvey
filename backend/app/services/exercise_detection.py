@@ -237,7 +237,7 @@ class ExerciseDetectionService:
         return False
     
     def detect_push_up(self, landmarks):
-        """Detect push-up exercise - requires body to be close to ground"""
+        """Detect push-up exercise - requires body to be close to ground and horizontal"""
         left_shoulder = landmarks[PoseLandmark.LEFT_SHOULDER]
         left_elbow = landmarks[PoseLandmark.LEFT_ELBOW]
         left_wrist = landmarks[PoseLandmark.LEFT_WRIST]
@@ -270,10 +270,28 @@ class ExerciseDetectionService:
         # Using 0.6 (60% from top) ensures they're in the lower portion of the frame
         body_below_60_percent = body_lowest_point > 0.6
         
+        # DISTINGUISH FROM ARM CIRCLES:
+        # 1. Body must be horizontal (hips and shoulders at similar vertical positions)
+        #    In push-ups, body is horizontal. In arm circles (standing), hips are much lower than shoulders
+        body_horizontal = abs(hip_y - shoulder_y) < 0.15  # Hips and shoulders should be close in y-position
+        
+        # 2. Wrists must be significantly below shoulders (not just slightly)
+        #    In arm circles, wrists might be at or above shoulder level. In push-ups, they're clearly below
+        wrists_significantly_below = (wrist_y - shoulder_y) > 0.12  # Wrists at least 12% below shoulders
+        
+        # 3. Shoulders should also be relatively low (not just the body lowest point)
+        #    This ensures person is in a prone/plank position, not standing
+        shoulders_also_low = shoulder_y > 0.5  # Shoulders should be below 50% height mark
+        
         state = self.exercise_states["push_up"]
         
-        # Must be in push-up position AND body fully below 60% height mark
-        if wrist_y > shoulder_y and body_below_60_percent:
+        # Must satisfy ALL conditions: push-up position, body below 60%, horizontal body alignment,
+        # wrists significantly below shoulders, and shoulders also low
+        if (wrist_y > shoulder_y and 
+            body_below_60_percent and 
+            body_horizontal and 
+            wrists_significantly_below and 
+            shoulders_also_low):
             # Detect push-up down (elbow bends)
             if avg_angle < 90 and state["stage"] == "up":
                 state["stage"] = "down"
