@@ -10,12 +10,12 @@ const VideoBox = ({ surveyId }) => {
   const animationFrameRef = useRef(null);
   
   const [isActive, setIsActive] = useState(false);
-  // Only track the 4 hardcoded exercises: push_up, squat, jumping_jack, plank
+  // Only track the 4 hardcoded exercises: push_up, squat, jumping_jack, arm_circle
   const [counters, setCounters] = useState({
     push_up: 0,
     squat: 0,
     jumping_jack: 0,
-    plank: 0
+    arm_circle: 0
   });
   const [detecting, setDetecting] = useState(false);
   const [error, setError] = useState(null);
@@ -123,6 +123,7 @@ const VideoBox = ({ surveyId }) => {
       'Burpees': 'burpee',
       'Mountain Climbers': 'mountain_climber',
       'High Knee': 'high_knee',
+      'Arm Circles': 'arm_circle',
       'Push-ups': 'push_up',
       'Lunges': 'lunge',
       'Plank': 'plank',
@@ -192,16 +193,20 @@ const VideoBox = ({ surveyId }) => {
       [28, 30], [28, 32],  // Right foot
     ];
     
-    // Draw connections (skeleton) in green
+    // Draw connections (skeleton) in green - make them more visible
+    ctx.save();
     ctx.strokeStyle = '#00ff00';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 3; // Thicker lines (3 instead of 2)
+    ctx.shadowColor = '#00ff00';
+    ctx.shadowBlur = 5; // Add glow to lines too
+    
     connections.forEach(([start, end]) => {
       if (landmarks[start] && landmarks[end]) {
         const startLandmark = landmarks[start];
         const endLandmark = landmarks[end];
         
-        // Only draw if visibility is good enough
-        if (startLandmark.visibility > 0.5 && endLandmark.visibility > 0.5) {
+        // Lower visibility threshold (0.3 instead of 0.5) to show more connections
+        if (startLandmark.visibility > 0.3 && endLandmark.visibility > 0.3) {
           const startX = startLandmark.x * width;
           const startY = startLandmark.y * height;
           const endX = endLandmark.x * width;
@@ -215,25 +220,34 @@ const VideoBox = ({ surveyId }) => {
       }
     });
     
-    // Draw landmarks as green circles
+    ctx.restore();
+    
+    // Draw landmarks as green circles - make them more visible
     landmarks.forEach((landmark, index) => {
-      if (landmark.visibility > 0.5) {
+      // Lower visibility threshold to show more landmarks (0.3 instead of 0.5)
+      if (landmark.visibility > 0.3) {
         const x = landmark.x * width;
         const y = landmark.y * height;
         
-        // Draw circle
+        // Draw larger, brighter circles for better visibility
+        ctx.save();
+        
+        // Add glow effect first
+        ctx.shadowColor = '#00ff00';
+        ctx.shadowBlur = 10;
+        
+        // Draw circle with green fill
         ctx.fillStyle = '#00ff00';
         ctx.beginPath();
-        ctx.arc(x, y, 4, 0, 2 * Math.PI);
+        ctx.arc(x, y, 5, 0, 2 * Math.PI); // Slightly larger (5 instead of 4)
         ctx.fill();
         
-        // Add glow effect
-        ctx.shadowColor = '#00ff00';
-        ctx.shadowBlur = 8;
-        ctx.beginPath();
-        ctx.arc(x, y, 4, 0, 2 * Math.PI);
-        ctx.fill();
-        ctx.shadowBlur = 0;
+        // Draw outline for better visibility
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        ctx.restore();
       }
     });
   }, []);
@@ -278,8 +292,21 @@ const VideoBox = ({ surveyId }) => {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
       // Draw landmarks if available (from previous frame response)
+      // Always draw landmarks on every frame if they exist in state
+      // This ensures they appear immediately when first detected
       if (landmarks && Array.isArray(landmarks) && landmarks.length > 0) {
-        drawLandmarks(ctx, landmarks, canvas.width, canvas.height);
+        try {
+          drawLandmarks(ctx, landmarks, canvas.width, canvas.height);
+        } catch (err) {
+          console.error('Error drawing landmarks:', err);
+        }
+      } else {
+        // Log when no landmarks are available for debugging
+        if (landmarks === null) {
+          // Landmarks not set yet - this is normal at startup
+        } else if (landmarks && landmarks.length === 0) {
+          console.log('Landmarks array is empty');
+        }
       }
       
       // Convert canvas to blob and send to backend
@@ -306,32 +333,44 @@ const VideoBox = ({ surveyId }) => {
           const data = await response.json();
           
           if (data.exercises) {
-            // Backend now only returns the 4 hardcoded exercises: push_up, squat, jumping_jack, plank
+            // Backend now only returns the 4 hardcoded exercises: push_up, squat, jumping_jack, arm_circle
             setCounters(data.exercises);
           }
           
-          // Store landmarks for drawing (use detected flag or check if landmarks exist)
-          if (data.landmarks && (data.detected === true || data.landmarks.length > 0)) {
+          // Store landmarks for drawing - show whenever landmarks are present
+          // Show landmarks immediately when detected
+          if (data.landmarks && Array.isArray(data.landmarks) && data.landmarks.length > 0) {
+            console.log('✅ Landmarks detected:', data.landmarks.length, 'points');
+            // Update state immediately - this will trigger drawing on next frame
             setLandmarks(data.landmarks);
-            // Redraw canvas with landmarks immediately after receiving them
-            if (canvasRef.current && videoRef.current && videoRef.current.readyState >= 2) {
-              const canvas = canvasRef.current;
-              const video = videoRef.current;
-              
-              // Ensure canvas dimensions match video
-              if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
+            
+            // Also draw immediately on current frame - don't wait for next frame cycle
+            // Use requestAnimationFrame to ensure we draw on latest video frame
+            requestAnimationFrame(() => {
+              if (canvasRef.current && videoRef.current && videoRef.current.readyState >= 2) {
+                const canvas = canvasRef.current;
+                const video = videoRef.current;
+                
+                // Ensure canvas dimensions match video
+                if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+                  canvas.width = video.videoWidth;
+                  canvas.height = video.videoHeight;
+                }
+                
+                const ctx = canvas.getContext('2d');
+                // Clear and redraw the current video frame first
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                // Then draw landmarks on top immediately
+                console.log('🎨 Drawing', data.landmarks.length, 'landmarks on canvas');
+                drawLandmarks(ctx, data.landmarks, canvas.width, canvas.height);
               }
-              
-              const ctx = canvas.getContext('2d');
-              // Redraw video frame
-              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-              // Draw new landmarks
-              drawLandmarks(ctx, data.landmarks, canvas.width, canvas.height);
-            }
+            });
           } else {
-            setLandmarks(null);
+            // Clear landmarks only if explicitly no detection
+            if (data.detected === false || !data.landmarks) {
+              setLandmarks(null);
+            }
           }
         } catch (err) {
           console.error('Error processing frame:', err);
@@ -843,7 +882,7 @@ const VideoBox = ({ surveyId }) => {
                 'push_up': 'PUSH-UPS',
                 'squat': 'SQUATS',
                 'jumping_jack': 'JUMPING JACKS',
-                'plank': 'PLANK'
+                'arm_circle': 'ARM CIRCLES'
               };
               return (
                 <div key={key} className={`counter-card ${key}`}>

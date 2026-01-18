@@ -1,4 +1,5 @@
 """Exercise detection service"""
+import math
 from app.utils.constants import PoseLandmark
 from app.utils.geometry import calculate_angle, calculate_distance
 
@@ -18,7 +19,8 @@ class ExerciseDetectionService:
             "lunge": {"count": 0, "stage": "standing", "prev_knee_angle": 180},
             "plank": {"count": 0, "stage": "not_plank", "hold_time": 0},
             "jump_squat": {"count": 0, "stage": "up", "prev_hip_y": 0, "prev_angle": 180},
-            "star_jump": {"count": 0, "stage": "closed", "prev_arm_distance": 0, "prev_leg_distance": 0}
+            "star_jump": {"count": 0, "stage": "closed", "prev_arm_distance": 0, "prev_leg_distance": 0},
+            "arm_circle": {"count": 0, "stage": "neutral", "cycle_count": 0, "prev_wrist_angle": 0}
         }
     
     def reset_counters(self):
@@ -45,7 +47,8 @@ class ExerciseDetectionService:
             "lunge": self.detect_lunge(landmarks),
             "plank": self.detect_plank(landmarks),
             "jump_squat": self.detect_jump_squat(landmarks),
-            "star_jump": self.detect_star_jump(landmarks)
+            "star_jump": self.detect_star_jump(landmarks),
+            "arm_circle": self.detect_arm_circle(landmarks)
         }
     
     def detect_squat(self, landmarks):
@@ -207,45 +210,44 @@ class ExerciseDetectionService:
         return False
     
     def detect_high_knee(self, landmarks):
-        """Detect high knee exercise"""
+        """Detect high knee exercise - made more lenient like squats"""
         left_knee = landmarks[PoseLandmark.LEFT_KNEE]
         right_knee = landmarks[PoseLandmark.RIGHT_KNEE]
         left_hip = landmarks[PoseLandmark.LEFT_HIP]
         right_hip = landmarks[PoseLandmark.RIGHT_HIP]
-        left_ankle = landmarks[PoseLandmark.LEFT_ANKLE]
-        right_ankle = landmarks[PoseLandmark.RIGHT_ANKLE]
-        
-        # Check if standing (ankles below hips)
-        left_ankle_below = left_ankle.y > left_hip.y
-        right_ankle_below = right_ankle.y > right_hip.y
         
         state = self.exercise_states["high_knee"]
         
-        if left_ankle_below and right_ankle_below:
-            # Detect knee lifting high
-            left_knee_high = left_knee.y < left_hip.y - 0.15
-            right_knee_high = right_knee.y < right_hip.y - 0.15
-            
-            if state["stage"] == "down":
-                if left_knee_high or right_knee_high:
-                    state["stage"] = "up"
-            elif state["stage"] == "up":
-                # Knee returns down
-                if not left_knee_high and not right_knee_high:
-                    state["stage"] = "down"
-                    state["count"] += 1
-                    return True
+        # More lenient: check if either knee is raised (not both required)
+        # Reduced threshold from 0.15 to 0.08 for easier detection
+        left_knee_high = left_knee.y < left_hip.y - 0.08
+        right_knee_high = right_knee.y < right_hip.y - 0.08
+        
+        # Simple state machine - similar to squat detection
+        # Detect knee lifting up (either knee)
+        if (left_knee_high or right_knee_high) and state["stage"] == "down":
+            state["stage"] = "up"
+        
+        # Detect knee returning down (both knees down) - rep complete
+        elif (not left_knee_high and not right_knee_high) and state["stage"] == "up":
+            state["stage"] = "down"
+            state["count"] += 1
+            return True
         
         return False
     
     def detect_push_up(self, landmarks):
-        """Detect push-up exercise"""
+        """Detect push-up exercise - requires body to be close to ground"""
         left_shoulder = landmarks[PoseLandmark.LEFT_SHOULDER]
         left_elbow = landmarks[PoseLandmark.LEFT_ELBOW]
         left_wrist = landmarks[PoseLandmark.LEFT_WRIST]
         right_shoulder = landmarks[PoseLandmark.RIGHT_SHOULDER]
         right_elbow = landmarks[PoseLandmark.RIGHT_ELBOW]
         right_wrist = landmarks[PoseLandmark.RIGHT_WRIST]
+        left_hip = landmarks[PoseLandmark.LEFT_HIP]
+        right_hip = landmarks[PoseLandmark.RIGHT_HIP]
+        left_ankle = landmarks[PoseLandmark.LEFT_ANKLE]
+        right_ankle = landmarks[PoseLandmark.RIGHT_ANKLE]
         
         # Calculate average elbow angle
         left_angle = calculate_angle(left_shoulder, left_elbow, left_wrist)
@@ -255,11 +257,23 @@ class ExerciseDetectionService:
         # Check if in push-up position (hands below shoulders)
         wrist_y = (left_wrist.y + right_wrist.y) / 2
         shoulder_y = (left_shoulder.y + right_shoulder.y) / 2
+        hip_y = (left_hip.y + right_hip.y) / 2
+        ankle_y = (left_ankle.y + right_ankle.y) / 2
+        
+        # Calculate body height from ground - use the lowest point (ankles or hips)
+        # In normalized coordinates: 0 = top of image, 1 = bottom of image
+        # Higher y values = lower on screen = closer to ground in real world
+        body_lowest_point = max(hip_y, ankle_y)
+        
+        # For push-ups, body should be fully below 60% height mark (y > 0.6)
+        # This ensures person is close to ground in a proper push-up position
+        # Using 0.6 (60% from top) ensures they're in the lower portion of the frame
+        body_below_60_percent = body_lowest_point > 0.6
         
         state = self.exercise_states["push_up"]
         
-        # Must be in push-up position
-        if wrist_y > shoulder_y:
+        # Must be in push-up position AND body fully below 60% height mark
+        if wrist_y > shoulder_y and body_below_60_percent:
             # Detect push-up down (elbow bends)
             if avg_angle < 90 and state["stage"] == "up":
                 state["stage"] = "down"
@@ -398,6 +412,65 @@ class ExerciseDetectionService:
                 state["stage"] = "closed"
                 state["count"] += 1
                 return True
+        
+        return False
+    
+    def detect_arm_circle(self, landmarks):
+        """Detect arm circle exercise - simplified and lenient like other exercises"""
+        left_shoulder = landmarks[PoseLandmark.LEFT_SHOULDER]
+        right_shoulder = landmarks[PoseLandmark.RIGHT_SHOULDER]
+        left_wrist = landmarks[PoseLandmark.LEFT_WRIST]
+        right_wrist = landmarks[PoseLandmark.RIGHT_WRIST]
+        
+        state = self.exercise_states["arm_circle"]
+        
+        # Calculate wrist position relative to shoulder (for circular motion)
+        # Use average of both arms for more lenient detection
+        left_wrist_rel_x = left_wrist.x - left_shoulder.x
+        left_wrist_rel_y = left_wrist.y - left_shoulder.y
+        right_wrist_rel_x = right_wrist.x - right_shoulder.x
+        right_wrist_rel_y = right_wrist.y - right_shoulder.y
+        
+        # Calculate angle of wrist relative to shoulder (for circular motion tracking)
+        left_angle = math.degrees(math.atan2(left_wrist_rel_y, left_wrist_rel_x))
+        right_angle = math.degrees(math.atan2(right_wrist_rel_y, right_wrist_rel_x))
+        avg_angle = (left_angle + right_angle) / 2
+        
+        # Normalize angle to 0-360
+        avg_angle = avg_angle % 360
+        if avg_angle < 0:
+            avg_angle += 360
+        
+        # Track angle changes to detect circular motion
+        prev_angle = state.get("prev_wrist_angle", avg_angle)
+        
+        # Calculate angle difference (handle wrap-around)
+        angle_diff = abs(avg_angle - prev_angle)
+        if angle_diff > 180:
+            angle_diff = 360 - angle_diff
+        
+        # Simple detection: track accumulated circular motion
+        # More lenient: lower threshold for one full circle
+        cycle_count = state.get("cycle_count", 0)
+        
+        # Accumulate angle movement when arms are moving
+        if angle_diff > 5:  # Only track if there's significant movement (>5 degrees)
+            cycle_count += angle_diff
+            state["cycle_count"] = cycle_count
+            
+            # Count one rep when accumulated angle reaches ~270 degrees (more lenient than 360)
+            if cycle_count >= 270:
+                state["cycle_count"] = 0
+                state["count"] += 1
+                state["prev_wrist_angle"] = avg_angle
+                return True
+        
+        # Update previous angle
+        state["prev_wrist_angle"] = avg_angle
+        
+        # Reset cycle if no movement (arms stopped)
+        if angle_diff < 1:
+            state["cycle_count"] = 0
         
         return False
 

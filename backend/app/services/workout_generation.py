@@ -86,7 +86,7 @@ Instructions:
    - "Push-ups" (for option 1) - 10 reps
    - "Squats" (for option 2) - 10 reps
    - "Jumping Jacks" (for option 3) - 10 reps
-   - "Plank" (for option 4) - 10 reps (hold for 10 seconds)
+   - "Arm Circles" (for option 4) - 10 reps
 3. These 4 exercises are hardcoded because they are the most visually distinct and easiest to detect
 4. ALWAYS use 10 reps for all exercises (ignore intensity preferences)
 5. For short_answer questions, create a break segment (is_break: true)
@@ -132,7 +132,7 @@ Return a JSON object with this exact structure:
                 {{
                     "option": "Option text 4",
                     "exercise": {{
-                        "name": "Plank",
+                        "name": "Arm Circles",
                         "reps": 10,
                         "duration": null,
                         "equipment": null
@@ -142,7 +142,7 @@ Return a JSON object with this exact structure:
             "exercises": []
         }}
     ],
-    "summary": "Workout plan using hardcoded exercises (Push-ups, Squats, Jumping Jacks, Plank) with 10 reps each."
+    "summary": "Workout plan using hardcoded exercises (Push-ups, Squats, Jumping Jacks, Arm Circles) with 10 reps each."
 }}"""
         
         return prompt
@@ -194,11 +194,11 @@ Return a JSON object with this exact structure:
         1. Push-ups (upper body, pushing motion)
         2. Squats (lower body, squatting motion)
         3. Jumping Jacks (full body, jumping motion)
-        4. Plank (core, static hold - replaces sit-ups as it's more easily detected)
+        4. Arm Circles (upper body, circular arm motion)
         """
         # Always return these 4 exercises in the same order for every question
         # These are the most distinct movements and easiest to detect
-        return ["Push-ups", "Squats", "Jumping Jacks", "Plank"]
+        return ["Push-ups", "Squats", "Jumping Jacks", "Arm Circles"]
     
     def _generate_mock_workout(self, preferences: WorkoutPreferences, questions: list[SurveyQuestion]) -> GeneratedWorkout:
         """
@@ -233,7 +233,7 @@ Return a JSON object with this exact structure:
                 num_options = min(len(options), 4)  # Max 4 options
                 
                 for j, option in enumerate(options[:num_options]):
-                    # Always assign in order: Push-ups, Squats, Jumping Jacks, Plank
+                    # Always assign in order: Push-ups, Squats, Jumping Jacks, Arm Circles
                     exercise_name = four_exercises[j % len(four_exercises)]
                     exercise = Exercise(
                         name=exercise_name,
@@ -256,7 +256,7 @@ Return a JSON object with this exact structure:
                     is_break=False
                 ))
         
-        summary = f"Generated {len(segments)} workout segments using hardcoded exercises (Push-ups, Squats, Jumping Jacks, Plank) with {FIXED_REPS} reps each."
+        summary = f"Generated {len(segments)} workout segments using hardcoded exercises (Push-ups, Squats, Jumping Jacks, Arm Circles) with {FIXED_REPS} reps each."
         
         return GeneratedWorkout(
             total_duration=preferences.time,  # Keep time from preferences for API compatibility

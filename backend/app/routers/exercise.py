@@ -40,8 +40,8 @@ async def process_frame(file: UploadFile = File(...)):
         # Process with MediaPipe Pose Landmarker (VIDEO mode for better performance)
         detection_result = pose_detection_service.detect_pose(mp_image)
         
-        # Only track the 4 hardcoded exercises: push_up, squat, jumping_jack, plank
-        four_exercises = ["push_up", "squat", "jumping_jack", "plank"]
+        # Only track the 4 hardcoded exercises: push_up, squat, jumping_jack, arm_circle
+        four_exercises = ["push_up", "squat", "jumping_jack", "arm_circle"]
         
         if not detection_result.pose_landmarks or len(detection_result.pose_landmarks) == 0:
             all_counters = exercise_detection_service.get_counters()
@@ -93,5 +93,5 @@ async def reset_counters():
 async def get_counters():
     """Get current exercise counters (only the 4 hardcoded exercises)"""
     all_counters = exercise_detection_service.get_counters()
-    four_exercises = ["push_up", "squat", "jumping_jack", "plank"]
+    four_exercises = ["push_up", "squat", "jumping_jack", "arm_circle"]
     return {key: all_counters.get(key, 0) for key in four_exercises}
