@@ -16,5 +16,12 @@ SURVEYMONKEY_BASE_URL = os.getenv("SURVEYMONKEY_BASE_URL", "https://api.surveymo
 # OpenAI Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
+# ElevenLabs Configuration
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
+
+# MongoDB Configuration
+MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
+MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "uottahack")
+
 # CORS Configuration
 CORS_ORIGINS = ["*"]  # In production, specify actual origins
