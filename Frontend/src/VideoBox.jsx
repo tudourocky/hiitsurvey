@@ -27,9 +27,15 @@ const VideoBox = ({ surveyId }) => {
   const [currentExerciseReps, setCurrentExerciseReps] = useState(0);
   const [previousCounters, setPreviousCounters] = useState({});
   const [isExerciseComplete, setIsExerciseComplete] = useState(false);
+  const [lockedAnswers, setLockedAnswers] = useState({}); // Track which questions have locked answers
   const [loadingSurvey, setLoadingSurvey] = useState(false);
   const [loadingWorkout, setLoadingWorkout] = useState(false);
   const [landmarks, setLandmarks] = useState(null);
+  const [countdown, setCountdown] = useState(null); // 3, 2, 1, or null (no countdown)
+  const [isCountdownActive, setIsCountdownActive] = useState(false);
+  const baselineCountersRef = useRef({ push_up: 0, squat: 0, jumping_jack: 0, arm_circle: 0 }); // Baseline when question started
+  const currentExerciseKeyRef = useRef(null); // Current exercise counter key
+  const lastBaselineQuestionRef = useRef(-1); // Track which question baseline was set for
 
   const startWebcam = async () => {
     try {
@@ -60,8 +66,9 @@ const VideoBox = ({ surveyId }) => {
             canvasRef.current.width = videoRef.current.videoWidth;
             canvasRef.current.height = videoRef.current.videoHeight;
             // Only set active after video is ready
-            setIsActive(true);
             setDetecting(false);
+            // Start countdown after camera is ready
+            startCountdown();
           }
         };
         
@@ -72,8 +79,11 @@ const VideoBox = ({ surveyId }) => {
               canvasRef.current.width = videoRef.current.videoWidth;
               canvasRef.current.height = videoRef.current.videoHeight;
             }
-            setIsActive(true);
             setDetecting(false);
+            // Start countdown if not already active
+            if (!isActive) {
+              startCountdown();
+            }
           }
         }, 1000);
       }
@@ -100,13 +110,35 @@ const VideoBox = ({ surveyId }) => {
     }
     setIsActive(false);
     setDetecting(false);
+    setCountdown(null);
+    setIsCountdownActive(false);
     setLandmarks(null);
+  };
+
+  // Countdown function: 3, 2, 1, then start
+  const startCountdown = () => {
+    setIsCountdownActive(true);
+    setCountdown(3);
+    
+    const countdownInterval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev === null || prev <= 1) {
+          clearInterval(countdownInterval);
+          setIsCountdownActive(false);
+          setIsActive(true); // Start detection after countdown
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000); // Count down every second
   };
 
   const resetCounters = async () => {
     try {
       await fetch(`${API_URL}/api/reset-counters`, { method: 'POST' });
-      setCounters(Object.keys(counters).reduce((acc, k) => ({ ...acc, [k]: 0 }), {}));
+      const zeroCounters = { push_up: 0, squat: 0, jumping_jack: 0, arm_circle: 0 };
+      setCounters(zeroCounters);
+      baselineCountersRef.current = { ...zeroCounters };
       setCurrentExerciseReps(0);
       setPreviousCounters({});
       setIsExerciseComplete(false);
@@ -256,7 +288,9 @@ const VideoBox = ({ surveyId }) => {
   const lastFrameTime = useRef(0);
   const processFrame = useCallback(async () => {
     // Check if we should continue processing
-    if (!isActive || !videoRef.current || !canvasRef.current) {
+    // Allow processing during countdown so landmarks can show up and calibrate
+    // Only need video and canvas to be available
+    if (!videoRef.current || !canvasRef.current) {
       return;
     }
     
@@ -377,28 +411,25 @@ const VideoBox = ({ surveyId }) => {
           // On error, still continue processing but maybe slow down
           // Don't break the loop
         } finally {
-          // Always continue processing if still active
-          if (isActive && videoRef.current && canvasRef.current) {
+          // Always continue processing if video/canvas are available (even during countdown)
+          if (videoRef.current && canvasRef.current) {
             animationFrameRef.current = requestAnimationFrame(processFrame);
           }
         }
       }, 'image/jpeg', 0.8);
     } else {
       // Video not ready yet, wait a bit longer and try again
-      if (isActive && videoRef.current) {
+      if (videoRef.current) {
         animationFrameRef.current = requestAnimationFrame(processFrame);
       }
     }
-  }, [isActive, landmarks, drawLandmarks]);
+  }, [landmarks, drawLandmarks]);
 
   // Start/stop frame processing
+  // Process frames continuously (including during countdown) so landmarks can show up
   useEffect(() => {
-    if (isActive) {
+    if (videoRef.current && canvasRef.current) {
       processFrame();
-    } else {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
     }
     
     return () => {
@@ -406,9 +437,9 @@ const VideoBox = ({ surveyId }) => {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [isActive, processFrame, landmarks, drawLandmarks]);
+  }, [processFrame]);
 
-  // Track reps for selected exercise
+  // Track reps for selected exercise - uses ref for baseline to avoid re-render loops
   useEffect(() => {
     if (!selectedExercise) {
       setCurrentExerciseReps(0);
@@ -417,22 +448,29 @@ const VideoBox = ({ surveyId }) => {
     }
 
     const counterKey = mapExerciseNameToCounter(selectedExercise.name);
-    const currentCount = counters[counterKey] || 0;
-    const previousCount = previousCounters[counterKey] !== undefined ? previousCounters[counterKey] : (counters[counterKey] || 0);
+    currentExerciseKeyRef.current = counterKey;
     
-    // Calculate reps done for this exercise (since it was selected)
-    // Use max to handle counter resets
-    const repsDone = Math.max(0, currentCount - previousCount);
+    const currentCount = counters[counterKey] || 0;
+    const baselineCount = baselineCountersRef.current[counterKey] || 0;
+    
+    // Calculate reps done for this exercise (since baseline was set)
+    const repsDone = Math.max(0, currentCount - baselineCount);
+    
+    console.log(`[Track Reps] ${selectedExercise.name}: current=${currentCount}, baseline=${baselineCount}, reps=${repsDone}`);
+    
+    // Update reps immediately for real-time progress bar
     setCurrentExerciseReps(repsDone);
     
-    // Check if required reps are met
-    const requiredReps = selectedExercise.reps || 0;
-    if (requiredReps > 0 && repsDone >= requiredReps) {
+    // Complete exercise after 5 reps
+    const requiredReps = 5;
+    
+    if (repsDone >= requiredReps && !isExerciseComplete) {
+      console.log(`[Track Reps] Exercise complete! ${repsDone} >= ${requiredReps}`);
       setIsExerciseComplete(true);
-    } else {
+    } else if (repsDone < requiredReps && isExerciseComplete) {
       setIsExerciseComplete(false);
     }
-  }, [counters, selectedExercise, previousCounters]);
+  }, [counters, selectedExercise, isExerciseComplete]);
 
   // Fetch survey when surveyId is provided
   useEffect(() => {
@@ -555,77 +593,172 @@ const VideoBox = ({ surveyId }) => {
     }
     const newExercise = mapping ? mapping.exercise : null;
     
-    // If exercise changed, reset tracking and capture baseline
+    // If exercise changed, reset tracking
+    // Don't reset baseline here - it should already be set when question started
     if (newExercise && (!selectedExercise || newExercise.name !== selectedExercise.name)) {
-      const counterKey = mapExerciseNameToCounter(newExercise.name);
-      setPreviousCounters(prev => ({ ...prev, [counterKey]: counters[counterKey] || 0 }));
       setCurrentExerciseReps(0);
       setIsExerciseComplete(false);
     }
     
     setSelectedExercise(newExercise);
-  }, [workout, survey, currentQuestionIndex, answers]);
-
-  const handleAnswer = (questionId, answer) => {
-    setAnswers(prev => ({ ...prev, [questionId]: answer }));
-    setError(null);
-    // Exercise tracking will be reset when selectedExercise updates
-  };
-
-  const nextQuestion = () => {
-    const currentQuestion = survey?.questions[currentQuestionIndex];
+  }, [workout, survey, currentQuestionIndex, answers, selectedExercise, counters]);
+  
+  // Set baseline counters when starting a new question
+  // This captures the counter values at the start so we can measure progress
+  useEffect(() => {
+    if (!survey || !workout) return;
     
-    // Must have an answer selected
-    if (!currentQuestion || !answers[currentQuestion.id]) {
-      setError('Please select an answer first!');
+    // Skip if baseline was already set for this question (e.g., by auto-advance)
+    if (lastBaselineQuestionRef.current === currentQuestionIndex) {
+      console.log(`[Baseline] Skipping - baseline already set for question ${currentQuestionIndex}`);
       return;
     }
     
-    // For multiple choice questions with exercises, must complete reps
-    if (currentQuestion.type === 'multiple_choice' && selectedExercise && selectedExercise.reps) {
-      if (!isExerciseComplete) {
-        const remaining = selectedExercise.reps - currentExerciseReps;
-        setError(`Complete ${remaining} more rep${remaining !== 1 ? 's' : ''} of ${selectedExercise.name} to continue!`);
-        return;
-      }
+    const currentQuestion = survey.questions[currentQuestionIndex];
+    if (!currentQuestion || currentQuestion.type === 'open_ended') {
+      return;
     }
     
-    // All checks passed, advance to next question
-    if (survey && currentQuestionIndex < survey.questions.length - 1) {
-      setCurrentQuestionIndex(prev => prev + 1);
+    // Set baseline to current counter values for this question
+    // This is the starting point for counting reps
+    console.log(`[Baseline] Setting baseline for question ${currentQuestionIndex}:`, { ...counters });
+    baselineCountersRef.current = {
+      push_up: counters.push_up || 0,
+      squat: counters.squat || 0,
+      jumping_jack: counters.jumping_jack || 0,
+      arm_circle: counters.arm_circle || 0
+    };
+    lastBaselineQuestionRef.current = currentQuestionIndex;
+    
+    // Also reset state-based previous counters for backwards compatibility
+    setPreviousCounters({ ...baselineCountersRef.current });
+  }, [survey, workout, currentQuestionIndex]); // Only run when question changes
+
+  // Auto-advance to next question when exercise is complete (after 5 reps)
+  useEffect(() => {
+    if (!isExerciseComplete || !survey) return;
+    
+    console.log(`[Auto-advance] Exercise complete! Current question: ${currentQuestionIndex}`);
+    
+    // Check if we're not on the last question
+    if (currentQuestionIndex >= survey.questions.length - 1) {
+      console.log('[Auto-advance] On last question - not advancing');
+      return;
+    }
+    
+    // Wait a moment before auto-advancing to show completion
+    const timer = setTimeout(() => {
+      console.log('[Auto-advance] Advancing to next question...');
+      
+      // Capture current counter values as baseline for next question BEFORE advancing
+      const newBaseline = {
+        push_up: counters.push_up || 0,
+        squat: counters.squat || 0,
+        jumping_jack: counters.jumping_jack || 0,
+        arm_circle: counters.arm_circle || 0
+      };
+      
+      // Get next question index before updating state
+      const nextQuestionIndex = currentQuestionIndex + 1;
+      
+      // Update the baseline ref for next question and mark it as set
+      baselineCountersRef.current = { ...newBaseline };
+      lastBaselineQuestionRef.current = nextQuestionIndex;
+      console.log(`[Auto-advance] Set baseline for question ${nextQuestionIndex}:`, newBaseline);
+      const nextQuestion = survey.questions[nextQuestionIndex];
+      
+      // Advance to next question
+      setCurrentQuestionIndex(nextQuestionIndex);
       setCurrentExerciseReps(0);
       setIsExerciseComplete(false);
-      setPreviousCounters({});
+      setSelectedExercise(null);
+      setPreviousCounters(newBaseline);
       setError(null);
+      
       // Clear answer for next question
-      const nextQuestion = survey.questions[currentQuestionIndex + 1];
       if (nextQuestion) {
         setAnswers(prev => {
           const newAnswers = { ...prev };
           delete newAnswers[nextQuestion.id];
           return newAnswers;
         });
+        // Clear locked status for next question
+        setLockedAnswers(prev => {
+          const newLocked = { ...prev };
+          delete newLocked[nextQuestion.id];
+          return newLocked;
+        });
+      }
+      
+      // Start countdown for next question
+      if (isActive) {
+        startCountdown();
+      }
+    }, 1500); // 1.5 second delay to show completion
+    
+    return () => clearTimeout(timer);
+  }, [isExerciseComplete, survey, currentQuestionIndex, isActive, counters]);
+
+  // Auto-select answer based on first exercise detected
+  useEffect(() => {
+    if (!workout || !survey || isCountdownActive) return; // Don't detect during countdown
+    
+    const currentQuestion = survey.questions[currentQuestionIndex];
+    if (!currentQuestion || currentQuestion.type === 'open_ended' || lockedAnswers[currentQuestion.id]) {
+      return; // Skip if open-ended or already locked
+    }
+
+    // Find the segment for this question
+    let segment = workout.segments.find(s => s.question_id === currentQuestion.id);
+    if (!segment) {
+      const questionIndexId = `q${currentQuestionIndex + 1}`;
+      segment = workout.segments.find(s => s.question_id === questionIndexId);
+    }
+    if (!segment) {
+      segment = workout.segments.find(s => 
+        s.question === currentQuestion.heading || 
+        s.question.toLowerCase().includes(currentQuestion.heading.toLowerCase())
+      );
+    }
+    
+    if (!segment || !segment.option_exercise_mapping) return;
+
+    // Check if any exercise has been detected (counter increased from baseline)
+    const exerciseMap = {
+      'push_up': 'Push-ups',
+      'squat': 'Squats',
+      'jumping_jack': 'Jumping Jacks',
+      'arm_circle': 'Arm Circles'
+    };
+
+    // Find which exercise was detected (counter increased from baseline ref)
+    for (const [counterKey, exerciseName] of Object.entries(exerciseMap)) {
+      const currentCount = counters[counterKey] || 0;
+      const baselineCount = baselineCountersRef.current[counterKey] || 0;
+      
+      // If a rep was detected (counter increased from baseline), find the matching option
+      if (currentCount > baselineCount && !answers[currentQuestion.id]) {
+        // Find which option maps to this exercise
+        const mapping = segment.option_exercise_mapping.find(m => 
+          m.exercise.name === exerciseName
+        );
+        
+        if (mapping) {
+          console.log(`[Auto-select] Detected ${exerciseName}: current=${currentCount}, baseline=${baselineCount}`);
+          console.log(`[Auto-select] Selecting option: ${mapping.option}`);
+          
+          // Auto-select this answer based on first detected exercise
+          setAnswers(prev => ({ ...prev, [currentQuestion.id]: mapping.option }));
+          setLockedAnswers(prev => ({ ...prev, [currentQuestion.id]: true }));
+          break; // Only select the first detected exercise
+        }
       }
     }
-  };
+  }, [counters, workout, survey, currentQuestionIndex, lockedAnswers, answers, isCountdownActive]);
+
+  // Removed nextQuestion - now handled by auto-advance
   
-  // Check if user can advance to next question
-  const canAdvance = () => {
-    const currentQuestion = survey?.questions[currentQuestionIndex];
-    
-    // Must have an answer
-    if (!currentQuestion || !answers[currentQuestion.id]) {
-      return false;
-    }
-    
-    // For multiple choice with exercise, must complete reps
-    if (currentQuestion.type === 'multiple_choice' && selectedExercise && selectedExercise.reps) {
-      return isExerciseComplete;
-    }
-    
-    // Open-ended questions or exercises without reps can advance
-    return true;
-  };
+  // Removed canAdvance - no longer needed (auto-advance handles this)
 
   const prevQuestion = () => {
     if (currentQuestionIndex > 0) {
@@ -710,7 +843,13 @@ const VideoBox = ({ surveyId }) => {
           <div className="video-wrapper-small">
             <video ref={videoRef} autoPlay playsInline muted className="video-element" />
             <canvas ref={canvasRef} className="canvas-overlay" />
-            {!isActive && <div className="video-placeholder">WAITING FOR SIGNAL...</div>}
+            {!isActive && !countdown && <div className="video-placeholder">WAITING FOR SIGNAL...</div>}
+            {countdown !== null && (
+              <div className="countdown-overlay">
+                <div className="countdown-number">{countdown}</div>
+                <div className="countdown-text">GET READY!</div>
+              </div>
+            )}
           </div>
           <div className="video-controls">
             {!isActive ? (
@@ -767,30 +906,41 @@ const VideoBox = ({ surveyId }) => {
                       <button
                         key={option.id}
                         className={`option-btn ${isSelected ? 'active' : ''} ${isSelectedExercise && !isExerciseComplete ? 'in-progress' : ''} ${isSelectedExercise && isExerciseComplete ? 'complete' : ''}`}
-                        onClick={() => handleAnswer(currentQuestion.id, option.text)}
-                        disabled={isSelected && selectedExercise && !isExerciseComplete}
+                        disabled={true}
+                        style={{ cursor: 'default' }}
                       >
                         <div className="option-text">{option.text}</div>
                         {exercise && (
                           <div className="option-exercise">
                             <span className="exercise-badge">→ {exercise.name}</span>
-                            {exercise.reps && (
-                              <span className="exercise-specs">
-                                {exercise.reps} reps
-                              </span>
-                            )}
+                            <span className="exercise-specs">
+                              5 reps
+                            </span>
                           </div>
                         )}
-                        {isSelectedExercise && exercise && exercise.reps && (
-                          <div className="option-progress">
-                            <div className="option-reps-counter">
-                              {currentExerciseReps} / {exercise.reps} reps
+                        {isSelectedExercise && exercise && (() => {
+                          // Progress bar shows percentage of reps done out of 5
+                          const requiredReps = 5;
+                          const progressPercentage = Math.min(100, (currentExerciseReps / requiredReps) * 100);
+                          
+                          return (
+                            <div className="option-progress">
+                              <div className="option-progress-bar">
+                                <div 
+                                  className="option-progress-fill"
+                                  style={{ 
+                                    width: `${progressPercentage}%`,
+                                    minWidth: progressPercentage > 0 ? '2px' : '0px',
+                                    display: 'block'
+                                  }}
+                                />
+                              </div>
+                              {isExerciseComplete && (
+                                <span className="complete-check">✓</span>
+                              )}
                             </div>
-                            {isExerciseComplete && (
-                              <span className="complete-check">✓</span>
-                            )}
-                          </div>
-                        )}
+                          );
+                        })()}
                       </button>
                     );
                   })}
@@ -817,27 +967,12 @@ const VideoBox = ({ surveyId }) => {
                     <span className="exercise-name">{selectedExercise.name}</span>
                   </div>
                   <div className="exercise-details">
-                    {selectedExercise.reps && (
-                      <span className={isExerciseComplete ? 'complete-reps' : ''}>
-                        Reps: {currentExerciseReps} / {selectedExercise.reps}
-                      </span>
-                    )}
                     {selectedExercise.duration && <span>Duration: {selectedExercise.duration}s</span>}
                     {selectedExercise.equipment && <span>Equipment: {selectedExercise.equipment}</span>}
                   </div>
-                  {selectedExercise.reps && (
-                    <div className="reps-progress">
-                      <div className="progress-bar">
-                        <div 
-                          className="progress-fill"
-                          style={{ width: `${Math.min(100, (currentExerciseReps / selectedExercise.reps) * 100)}%` }}
-                        />
-                      </div>
-                      {isExerciseComplete && (
-                        <div className="complete-message neon-text-yellow">
-                          ✓ EXERCISE COMPLETE! YOU CAN PROCEED
-                        </div>
-                      )}
+                  {isExerciseComplete && (
+                    <div className="complete-message neon-text-yellow">
+                      ✓ EXERCISE COMPLETE! MOVING TO NEXT QUESTION...
                     </div>
                   )}
                 </div>
@@ -849,32 +984,12 @@ const VideoBox = ({ surveyId }) => {
                 </div>
               )}
 
-              <div className="question-nav">
-                <button onClick={prevQuestion} disabled={currentQuestionIndex === 0} className="nav-btn">
-                  PREV
-                </button>
-                <button 
-                  onClick={nextQuestion} 
-                  disabled={
-                    currentQuestionIndex === survey.questions.length - 1 || 
-                    !canAdvance()
-                  } 
-                  className={`nav-btn ${!canAdvance() ? 'disabled' : ''}`}
-                  title={!canAdvance() && selectedExercise ? `Complete ${selectedExercise.reps} reps of ${selectedExercise.name}` : ''}
-                >
-                  {!canAdvance() && selectedExercise && selectedExercise.reps ? 
-                    `COMPLETE ${selectedExercise.reps} REPS` : 
-                    !canAdvance() ? 
-                    'SELECT ANSWER' : 
-                    'NEXT'}
-                </button>
-              </div>
             </div>
           )}
         </div>
 
         <aside className="counters-section neon-border-blue">
-          <h2>STATS</h2>
+          <h2>REPS</h2>
           <div className="counters-grid">
             {Object.entries(counters).map(([key, val]) => {
               // Map exercise keys to display names

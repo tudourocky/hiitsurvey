@@ -263,19 +263,26 @@
   padding-top: 0.5rem;
   border-top: 1px dashed #444;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 0.5rem;
   width: 100%;
 }
 
-.option-reps-counter {
-  font-size: 0.7rem;
-  color: var(--neon-blue);
-  font-weight: bold;
+.option-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  overflow: hidden;
+  position: relative;
 }
 
-.option-btn.complete .option-reps-counter {
-  color: var(--neon-yellow);
+.option-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00ffff, #00ff00);
+  box-shadow: 0 0 8px #00ffff;
+  transition: width 0.3s ease;
+  display: block;
 }
 
 .complete-check {
@@ -506,5 +513,88 @@
 
   .options-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Exercise Progress Bar - shows rep progress only (no count text) */
+.exercise-progress-container {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 2px dashed #444;
+}
+
+.exercise-progress-bar {
+  width: 100%;
+  height: 12px;
+  background: #1a1a1a;
+  border: 2px solid #444;
+  overflow: hidden;
+  position: relative;
+}
+
+.exercise-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--neon-pink), var(--neon-yellow));
+  box-shadow: 0 0 15px var(--neon-pink);
+  transition: width 0.3s ease;
+}
+
+/* Countdown Overlay */
+.countdown-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 10;
+  pointer-events: none;
+  /* Allow video/canvas to show through semi-transparent overlay */
+}
+
+.countdown-number {
+  font-size: 8rem;
+  font-weight: bold;
+  color: var(--neon-yellow);
+  text-shadow: 0 0 30px var(--neon-yellow), 0 0 60px var(--neon-yellow);
+  animation: countdown-pulse 1s ease-out;
+  font-family: 'Courier New', monospace;
+}
+
+.countdown-text {
+  font-size: 1.5rem;
+  color: var(--neon-pink);
+  text-shadow: 0 0 10px var(--neon-pink);
+  margin-top: 1rem;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  animation: countdown-fade 1s ease-out;
+}
+
+@keyframes countdown-pulse {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+}
+
+@keyframes countdown-fade {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
   }
 }
