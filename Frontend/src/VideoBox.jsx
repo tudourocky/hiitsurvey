@@ -173,7 +173,6 @@ const VideoBox = ({ surveyId }) => {
       'Bicep Curls': 'push_up', // fallback
       'Tricep Dips': 'push_up', // fallback
       'Pull-ups': 'push_up', // fallback
-      'Arm Circles': 'jumping_jack', // fallback
       'Dumbbell Thrusters': 'squat', // fallback
       'Dumbbell Bench Press': 'push_up', // fallback
       'Dumbbell Swings': 'jumping_jack', // fallback
@@ -456,7 +455,7 @@ const VideoBox = ({ surveyId }) => {
     // Calculate reps done for this exercise (since baseline was set)
     const repsDone = Math.max(0, currentCount - baselineCount);
     
-    console.log(`[Track Reps] ${selectedExercise.name}: current=${currentCount}, baseline=${baselineCount}, reps=${repsDone}`);
+    console.log(`[Track Reps] ${selectedExercise.name}: counterKey=${counterKey}, current=${currentCount}, baseline=${baselineCount}, reps=${repsDone}`);
     
     // Update reps immediately for real-time progress bar
     setCurrentExerciseReps(repsDone);
@@ -690,11 +689,12 @@ const VideoBox = ({ surveyId }) => {
         });
       }
       
-      // Start countdown for next question
-      if (isActive) {
-        startCountdown();
+      // Skip countdown when auto-advancing - user is already in the flow
+      // Just ensure isActive is true so detection continues
+      if (!isActive) {
+        setIsActive(true);
       }
-    }, 1500); // 1.5 second delay to show completion
+    }, 400); // 0.4 second delay to show completion
     
     return () => clearTimeout(timer);
   }, [isExerciseComplete, survey, currentQuestionIndex, isActive, counters]);
@@ -892,30 +892,22 @@ const VideoBox = ({ surveyId }) => {
     // Reset question tracking when workout is ready (so first question will play)
     lastQuestionReadRef.current = null;
 
-    // Announce that workout is ready
+    // Mark workout as announced and play first question directly
     const announceWorkoutReady = async () => {
       workoutAnnouncedRef.current = true;
-      console.log('🔊 Playing workout ready announcement');
       
-      try {
-        // Wait for the announcement to finish playing
-        await playTTSAudio("Workout ready. Let's begin.");
-        
-        // After announcement finishes, play the first question
-        if (survey.questions && survey.questions[0]) {
-          const firstQuestionKey = `${survey.questions[0].id}-0`;
-          // Only play if not already read
-          if (lastQuestionReadRef.current !== firstQuestionKey) {
-            lastQuestionReadRef.current = firstQuestionKey;
-            console.log('▶️ Playing first question after announcement');
-            // Small delay for better UX
-            setTimeout(() => {
-              playTTSAudio(survey.questions[0].heading);
-            }, 300);
-          }
+      // Play the first question directly without announcement
+      if (survey.questions && survey.questions[0]) {
+        const firstQuestionKey = `${survey.questions[0].id}-0`;
+        // Only play if not already read
+        if (lastQuestionReadRef.current !== firstQuestionKey) {
+          lastQuestionReadRef.current = firstQuestionKey;
+          console.log('▶️ Playing first question');
+          // Small delay for better UX
+          setTimeout(() => {
+            playTTSAudio(survey.questions[0].heading);
+          }, 300);
         }
-      } catch (error) {
-        console.error('Error in workout announcement:', error);
       }
     };
 
@@ -964,7 +956,7 @@ const VideoBox = ({ surveyId }) => {
     // Small delay to ensure question is fully displayed
     const timeoutId = setTimeout(() => {
       playTTSAudio(currentQuestion.heading);
-    }, 500);
+    }, 200);
 
     return () => {
       clearTimeout(timeoutId);
