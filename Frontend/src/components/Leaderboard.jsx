@@ -107,7 +107,7 @@ export default function Leaderboard() {
                     <div className="user-avatar">
                       {(user.Name ?? '?').charAt(0).toUpperCase()}
                     </div>
-                    <span className="user-name">{user.Name}</span>
+                    <span className="user-name">{user.Name || 'Unknown User'}</span>
                   </div>
                 </div>
                 <div className="table-cell score-col">

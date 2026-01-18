@@ -8,6 +8,9 @@ from .survey import (
     CreateSurveyRequest,
     Mission,
     MissionListResponse,
+    SurveyResponseAnswer,
+    SubmitSurveyResponseRequest,
+    SubmitSurveyResponseResponse,
 )
 from .workout import (
     WorkoutPreferences,
@@ -34,6 +37,9 @@ __all__ = [
     "CreateSurveyRequest",
     "Mission",
     "MissionListResponse",
+    "SurveyResponseAnswer",
+    "SubmitSurveyResponseRequest",
+    "SubmitSurveyResponseResponse",
     "WorkoutPreferences",
     "GenerateWorkoutRequest",
     "Exercise",

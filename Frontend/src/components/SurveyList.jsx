@@ -15,15 +15,30 @@ const SurveyList = () => {
     const [liveList, setLiveList] = useState([]);
     const [removeList, setRemoveList] = useState([]);
 
-    const fetch = async() => {
-            const thing = await extractSurveys();
-            return thing;
+    const fetchSurveys = async() => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/surveys`);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch surveys: ${response.status} ${response.statusText}`);
+            }
+            const data = await response.json();
+            // Handle both {surveys: [...], total: N} and direct array responses
+            return Array.isArray(data) ? data : (data.surveys || []);
+        } catch (error) {
+            console.error('Error fetching surveys:', error);
+            return [];
+        }
     }
 
   useEffect(()=>{
-        
-        fetch()
-        .then((res) => {setSurveys(res)})
+        fetchSurveys()
+        .then((res) => {
+            setSurveys(res);
+        })
+        .catch((error) => {
+            console.error('Error in fetchSurveys:', error);
+            setSurveys([]);
+        });
   }, [])
  
 
@@ -87,7 +102,9 @@ const SurveyList = () => {
                   >
                     <div className="survey-info">
                       <h3 className="survey-title">{survey.title}</h3>
-                      <p className="survey-artist">{survey.artist}</p>
+                      {survey.description && (
+                        <p className="survey-artist">{survey.description}</p>
+                      )}
                       <div className="survey-meta">
                         {
                             (survey.live) ? 
@@ -95,7 +112,7 @@ const SurveyList = () => {
                                 :
                                 <button className="survey-button" onClick={() => { setLiveList([]);  goLive([survey.id]).then((res) => {setSurveys(res);});}}>Go Live</button>
                         }
-                        <button className={`survey-button ${(liveList.includes(survey.id) || removeList.includes(survey.id)) ? "active": ""}`} onClick={() => buttonClick(survey.live, survey.id)}></button>
+                        <button className={`survey-button ${(liveList.includes(survey.id) || removeList.includes(survey.id)) ? "active": ""}`} onClick={() => buttonClick(survey.live || false, survey.id)}></button>
                       </div>
                     </div>
                   </div>

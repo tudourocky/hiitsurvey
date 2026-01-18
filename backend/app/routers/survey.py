@@ -1,6 +1,9 @@
 """Survey router"""
 from fastapi import APIRouter, HTTPException
-from app.models.survey import Survey, SurveyListResponse, CreateSurveyRequest, MissionListResponse
+from app.models.survey import (
+    Survey, SurveyListResponse, CreateSurveyRequest, MissionListResponse,
+    SubmitSurveyResponseRequest, SubmitSurveyResponseResponse
+)
 from app.services.survey_service import survey_service
 
 router = APIRouter()
@@ -123,3 +126,35 @@ def get_survey_config_status():
         status["error"] = "SURVEYMONKEY_ACCESS_TOKEN not configured in environment"
     
     return status
+
+
+@router.post("/surveys/{survey_id}/responses", response_model=SubmitSurveyResponseResponse)
+async def submit_survey_response(survey_id: str, request: SubmitSurveyResponseRequest):
+    """
+    Submit survey responses to SurveyMonkey.
+    The survey_id in the path must match the survey_id in the request body.
+    """
+    if request.survey_id != survey_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Survey ID in path does not match survey ID in request body"
+        )
+    
+    try:
+        # Convert answers to list of dicts for the service method
+        answers_list = [
+            {"question_id": answer.question_id, "answer": answer.answer}
+            for answer in request.answers
+        ]
+        
+        result = await survey_service.submit_survey_response(
+            survey_id=survey_id,
+            answers=answers_list
+        )
+        
+        return SubmitSurveyResponseResponse(**result)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error submitting survey response: {str(e)}"
+        )

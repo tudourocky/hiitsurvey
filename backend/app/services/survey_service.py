@@ -831,6 +831,268 @@ Description:"""
             missions.append(mission)
         
         return MissionListResponse(missions=missions, total=len(missions))
+    
+    async def submit_survey_response(self, survey_id: str, answers: List[Dict]) -> Dict:
+        """
+        Submit survey responses to SurveyMonkey API.
+        
+        Args:
+            survey_id: The SurveyMonkey survey ID
+            answers: List of answers in format [{"question_id": "q1", "answer": "Option 1"}]
+        
+        Returns:
+            Dict with success status, message, and optional response_id
+        """
+        if not SURVEYMONKEY_TOKEN:
+            return {
+                "success": False,
+                "message": "SURVEYMONKEY_ACCESS_TOKEN not configured. Response saved locally only.",
+                "response_id": None
+            }
+        
+        try:
+            # First, get our survey model to understand question structure
+            survey = await self.get_survey(survey_id)
+            print(f"[Submit Response] Submitting {len(answers)} answers for survey {survey_id}")
+            
+            # Get survey details from SurveyMonkey to get proper question/choice IDs
+            async with httpx.AsyncClient() as client:
+                details_response = await client.get(
+                    f"{SURVEYMONKEY_BASE_URL}/surveys/{survey_id}/details",
+                    headers={
+                        "Authorization": f"Bearer {SURVEYMONKEY_TOKEN}",
+                        "Content-Type": "application/json"
+                    }
+                )
+                details_response.raise_for_status()
+                survey_details = details_response.json()
+                
+                # Build pages structure for response submission
+                # SurveyMonkey expects responses in format: {pages: [{id: page_id, questions: [{id: q_id, answers: [...]}]}]}
+                pages_data = survey_details.get("pages", [])
+                if not pages_data:
+                    return {
+                        "success": False,
+                        "message": f"Survey {survey_id} has no pages. Cannot submit response.",
+                        "response_id": None
+                    }
+                
+                # Create a mapping from our question IDs/headings to SurveyMonkey question objects
+                # Our survey.questions has the same order as SurveyMonkey's questions
+                question_mapping = {}
+                question_index = 0
+                for page in pages_data:
+                    for sm_question in page.get("questions", []):
+                        sm_q_id = str(sm_question.get("id", ""))
+                        sm_heading = sm_question.get("headings", [{}])[0].get("heading", "")
+                        
+                        # Map by our survey's question order (since they should match)
+                        if question_index < len(survey.questions):
+                            our_question = survey.questions[question_index]
+                            # Map by our question ID, heading, and SurveyMonkey question ID
+                            question_mapping[our_question.id] = {
+                                "sm_question": sm_question,
+                                "sm_q_id": sm_q_id,
+                                "sm_heading": sm_heading,
+                                "page_id": str(page.get("id", ""))
+                            }
+                            question_index += 1
+                
+                print(f"[Submit Response] Mapped {len(question_mapping)} questions")
+                
+                # Map our answers to SurveyMonkey format
+                response_pages = {}
+                matched_count = 0
+                
+                for answer in answers:
+                    our_q_id = answer.get("question_id", "")
+                    answer_text = answer.get("answer", "")
+                    
+                    if our_q_id not in question_mapping:
+                        print(f"[Submit Response] Warning: Could not find mapping for question_id: {our_q_id}")
+                        continue
+                    
+                    mapping = question_mapping[our_q_id]
+                    sm_question = mapping["sm_question"]
+                    sm_q_id = mapping["sm_q_id"]
+                    page_id = mapping["page_id"]
+                    
+                    # Build answer structure based on question type
+                    question_family = sm_question.get("family", "")
+                    answer_data = {}
+                    
+                    if question_family in ["single_choice", "multiple_choice"]:
+                        # Find the choice ID that matches the answer text
+                        choices = sm_question.get("answers", {}).get("choices", [])
+                        matching_choice_id = None
+                        for choice in choices:
+                            choice_text = choice.get("text", "").strip()
+                            if choice_text == answer_text.strip() or choice_text.lower() == answer_text.lower():
+                                matching_choice_id = str(choice.get("id", ""))
+                                break
+                        
+                        if matching_choice_id:
+                            answer_data = {"choice_id": matching_choice_id}
+                            print(f"[Submit Response] Matched choice '{answer_text}' to choice_id: {matching_choice_id}")
+                        else:
+                            # If no matching choice found, log warning
+                            print(f"[Submit Response] Warning: No matching choice for '{answer_text}' in question {sm_q_id}")
+                            print(f"  Available choices: {[c.get('text') for c in choices]}")
+                            # Try to use first choice or skip
+                            if choices:
+                                answer_data = {"choice_id": str(choices[0].get("id", ""))}
+                            else:
+                                continue
+                    else:
+                        # Open-ended or other text-based questions
+                        answer_data = {"text": answer_text}
+                    
+                    if answer_data:
+                        # Add to response pages structure
+                        if page_id not in response_pages:
+                            response_pages[page_id] = {"page_id": page_id, "questions": []}
+                        
+                        response_pages[page_id]["questions"].append({
+                            "id": sm_q_id,
+                            "answers": [answer_data]
+                        })
+                        matched_count += 1
+                
+                print(f"[Submit Response] Matched {matched_count}/{len(answers)} answers to SurveyMonkey questions")
+                
+                # Convert response_pages dict to list
+                response_pages_list = list(response_pages.values())
+                
+                if not response_pages_list or not any(page.get("questions") for page in response_pages_list):
+                    return {
+                        "success": False,
+                        "message": f"No valid answers to submit. Matched {matched_count}/{len(answers)} answers. Please check answer format.",
+                        "response_id": None
+                    }
+                
+                # Get or create a web collector for this survey
+                # First, try to get existing collectors
+                collectors_response = await client.get(
+                    f"{SURVEYMONKEY_BASE_URL}/surveys/{survey_id}/collectors",
+                    headers={
+                        "Authorization": f"Bearer {SURVEYMONKEY_TOKEN}",
+                        "Content-Type": "application/json"
+                    },
+                    params={"type": "weblink", "per_page": 10}
+                )
+                collectors_response.raise_for_status()
+                collectors_data = collectors_response.json()
+                
+                collector_id = None
+                collector_status = None
+                
+                # Look for an open collector first
+                if collectors_data.get("data"):
+                    for collector in collectors_data["data"]:
+                        collector_status = collector.get("status", "").lower()
+                        if collector_status == "open":
+                            collector_id = collector.get("id")
+                            print(f"[Submit Response] Found open collector: {collector_id}")
+                            break
+                    
+                    # If no open collector, use the first one
+                    if not collector_id and len(collectors_data["data"]) > 0:
+                        collector_id = collectors_data["data"][0].get("id")
+                        collector_status = collectors_data["data"][0].get("status", "").lower()
+                        print(f"[Submit Response] Using collector {collector_id} with status: {collector_status}")
+                
+                if not collector_id:
+                    # Create a web collector if none exists
+                    print(f"[Submit Response] No collector found, creating new one...")
+                    create_collector_response = await client.post(
+                        f"{SURVEYMONKEY_BASE_URL}/surveys/{survey_id}/collectors",
+                        headers={
+                            "Authorization": f"Bearer {SURVEYMONKEY_TOKEN}",
+                            "Content-Type": "application/json"
+                        },
+                        json={"type": "weblink", "name": f"API Collector for {survey_id}"}
+                    )
+                    create_collector_response.raise_for_status()
+                    collector_data = create_collector_response.json()
+                    collector_id = collector_data.get("id")
+                    print(f"[Submit Response] Created new collector: {collector_id}")
+                
+                if not collector_id:
+                    return {
+                        "success": False,
+                        "message": "Could not create or find a collector for this survey.",
+                        "response_id": None
+                    }
+                
+                # Submit the response with complete status
+                response_payload = {
+                    "pages": response_pages_list,
+                    "status": "completed"  # Mark as completed to ensure it's counted
+                }
+                
+                print(f"[Submit Response] Submitting to collector {collector_id} with payload: {response_payload}")
+                
+                submit_response = await client.post(
+                    f"{SURVEYMONKEY_BASE_URL}/collectors/{collector_id}/responses",
+                    headers={
+                        "Authorization": f"Bearer {SURVEYMONKEY_TOKEN}",
+                        "Content-Type": "application/json"
+                    },
+                    json=response_payload
+                )
+                
+                # Log response for debugging
+                print(f"[Submit Response] API Response Status: {submit_response.status_code}")
+                if submit_response.status_code >= 400:
+                    error_text = submit_response.text
+                    print(f"[Submit Response] API Error Response: {error_text}")
+                
+                submit_response.raise_for_status()
+                response_data = submit_response.json()
+                
+                response_id = response_data.get("id")
+                
+                print(f"[Submit Response] ✓ Successfully submitted response. Response ID: {response_id}")
+                
+                return {
+                    "success": True,
+                    "message": f"Survey response successfully submitted to SurveyMonkey (Response ID: {response_id})",
+                    "response_id": str(response_id) if response_id else None
+                }
+                
+        except httpx.HTTPStatusError as e:
+            error_msg = e.response.text
+            status_code = e.response.status_code
+            print(f"[Submit Response] ✗ HTTP Error {status_code}: {error_msg}")
+            
+            if status_code == 429:
+                # Rate limit - provide helpful message
+                error_msg = "Rate limit reached. SurveyMonkey API has rate limits (typically 120 requests/minute). Please wait a few minutes and try again. Your survey response was NOT saved - you may need to retry submission."
+            elif status_code == 401:
+                error_msg = "Authentication failed. Check your SURVEYMONKEY_ACCESS_TOKEN."
+            elif status_code == 403:
+                error_msg = "Access forbidden. Check your API permissions. SurveyMonkey API may not support submitting responses on your plan."
+            elif status_code == 404:
+                error_msg = f"Survey {survey_id} or collector not found in SurveyMonkey."
+            elif status_code == 400:
+                error_msg = f"Bad request: {error_msg}. Check response format."
+            
+            return {
+                "success": False,
+                "message": f"Failed to submit to SurveyMonkey (HTTP {status_code}): {error_msg}",
+                "response_id": None
+            }
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"[Submit Response] ✗ Exception: {str(e)}")
+            print(f"[Submit Response] Traceback: {error_trace}")
+            
+            return {
+                "success": False,
+                "message": f"Error submitting survey response: {str(e)}",
+                "response_id": None
+            }
 
 
 # Singleton instance
