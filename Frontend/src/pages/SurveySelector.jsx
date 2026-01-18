@@ -8,8 +8,7 @@ import * as FaIcons from 'react-icons/fa';
 import * as MdIcons from 'react-icons/md';
 import * as FiIcons from 'react-icons/fi';
 import SurveyList from '../components/SurveyList';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+import { API_BASE_URL } from '../shared/api';
 
 const ArcadeSurveySelector = () => {
   const navigate = useNavigate();

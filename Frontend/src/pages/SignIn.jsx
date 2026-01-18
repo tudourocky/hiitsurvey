@@ -16,7 +16,7 @@ export default function SignIn() {
           <button
             className={`toggle-btn`}
             onClick={() => {
-                window.location.href=`http://localhost:5173/surveys/?role=surveyor`
+                window.location.href=`/surveys/?role=surveyor`
             } }
           >
             <svg className="toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">

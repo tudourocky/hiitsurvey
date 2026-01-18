@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from app.config import CORS_ORIGINS
+from app.config import CORS_ORIGINS, CORS_ALLOW_CREDENTIALS
 from app.routers import health, exercise, workout, survey, tts
 from app.utils.database import connect_to_mongo, close_mongo_connection
 
@@ -26,10 +26,15 @@ app = FastAPI(
 )
 
 # Enable CORS for frontend
+allow_credentials = CORS_ALLOW_CREDENTIALS
+# Browsers reject wildcard origins when credentials are enabled.
+if "*" in CORS_ORIGINS:
+    allow_credentials = False
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_credentials=True,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

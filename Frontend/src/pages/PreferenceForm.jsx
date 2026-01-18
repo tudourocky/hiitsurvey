@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import "./PreferenceForm.css";
 import Navbar from "../components/Navbar"
+import { API_BASE_URL } from '../shared/api';
 
 export default function WorkoutForm() {
   const [formData, setFormData] = useState({
@@ -12,7 +13,7 @@ export default function WorkoutForm() {
 
   const handleSubmit = async() => {
     if (formData.workoutType && formData.duration && formData.intensity) {
-        const workout = await fetch("http://127.0.0.1:8000/generate-workout", {
+        const workout = await fetch(`${API_BASE_URL}/api/generate-workout`, {
             method: "POST",
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

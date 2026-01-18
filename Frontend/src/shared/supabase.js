@@ -5,10 +5,12 @@ export const client = createClient(import.meta.env.VITE_SUPABASE_URL,import.meta
 export var user = await client.auth.getUser();
 
 export const signInWithGoogle = async () => {
+  // Use the current site origin so this works on Vercel and locally.
+  const redirectTo = `${window.location.origin}/`;
   const {error } = await client.auth.signInWithOAuth({
     provider: 'google',
     options:{
-        redirectTo: "http://localhost:5173/"
+        redirectTo
     }
   });
   

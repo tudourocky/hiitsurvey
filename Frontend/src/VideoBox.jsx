@@ -1,8 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import './VideoBox.css';
 import { client, updateLeaderBoard } from './shared/supabase';
-
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+import { API_BASE_URL } from './shared/api';
 
 const VideoBox = ({ surveyId }) => {
   const videoRef = useRef(null);
@@ -615,7 +614,7 @@ const VideoBox = ({ surveyId }) => {
           options: q.options ? q.options.slice(0, 4).map(opt => opt.text) : null
         }));
 
-        const response = await fetch(`${API_URL}/api/generate-workout`, {
+        const response = await fetch(`${API_BASE_URL}/api/generate-workout`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

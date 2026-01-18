@@ -24,4 +24,21 @@ MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
 MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "uottahack")
 
 # CORS Configuration
-CORS_ORIGINS = ["*"]  # In production, specify actual origins
+_cors_origins_raw = os.getenv("CORS_ORIGINS", "*").strip()
+
+# `CORS_ORIGINS` may be:
+# - "*" (default): allow any origin (credentials will be disabled automatically)
+# - a comma-separated list: "https://yourapp.vercel.app,http://localhost:5173"
+if _cors_origins_raw == "*":
+    CORS_ORIGINS = ["*"]
+else:
+    CORS_ORIGINS = [o.strip() for o in _cors_origins_raw.split(",") if o.strip()]
+
+# Note: if CORS_ORIGINS contains "*", credentials must be disabled.
+CORS_ALLOW_CREDENTIALS = os.getenv("CORS_ALLOW_CREDENTIALS", "true").lower() in (
+    "1",
+    "true",
+    "yes",
+    "y",
+    "on",
+)
