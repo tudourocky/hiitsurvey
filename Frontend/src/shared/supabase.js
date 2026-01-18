@@ -5,7 +5,7 @@ export const client = createClient(import.meta.env.VITE_SUPABASE_URL,import.meta
 export var user = await client.auth.getUser();
 
 export const signInWithGoogle = async (role ) => {
-  const {data, error } = await client.auth.signInWithOAuth({
+  const {error } = await client.auth.signInWithOAuth({
     provider: 'google',
     options:{
         redirectTo: `http://localhost:5173/?role=${role}`
@@ -13,7 +13,7 @@ export const signInWithGoogle = async (role ) => {
   });
   
   if (error) {
-    // console.error(error);
+    console.error("Error signing in" + error);
   }
 }
 
@@ -54,7 +54,8 @@ export const checkLoggedIn = async () => {
   }
 }
 export const insertUser = async(role) =>{
-
+    const {user} = await client.auth.getUser();
+    console.log(user);
     const { data, error: insertError } = await client
         .from('Roles')
         .insert({
