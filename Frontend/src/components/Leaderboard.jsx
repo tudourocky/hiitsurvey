@@ -95,19 +95,19 @@ export default function Leaderboard() {
                 <div className="table-cell name-col">
                   <div className="user-info">
                     <div className="user-avatar">
-                      {user.Name.charAt(0).toUpperCase()}
+                      {(user.Name || 'U').charAt(0).toUpperCase()}
                     </div>
-                    <span className="user-name">{user.Name}</span>
+                    <span className="user-name">{user.Name || 'Unknown User'}</span>
                   </div>
                 </div>
                 <div className="table-cell score-col">
                   <div className="score-badge">
-                    {user.score.toLocaleString()}
+                    {(user.score || 0).toLocaleString()}
                   </div>
                 </div>
                 <div className="table-cell surveys-col">
                   <div className="surveys-badge">
-                    {user.completed_surveys}
+                    {user.completed_surveys || 0}
                   </div>
                 </div>
               </div>

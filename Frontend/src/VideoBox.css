@@ -31,6 +31,10 @@
   gap: 1.5rem;
 }
 
+.video-section:has(.video-wrapper-active) {
+  gap: 1rem;
+}
+
 .video-wrapper {
   background: #000;
   border: 4px solid var(--neon-purple);
@@ -49,6 +53,11 @@
   overflow: hidden;
   max-width: 500px;
   margin: 0 auto;
+}
+
+.video-wrapper-small.video-wrapper-active {
+  max-width: 400px;
+  max-height: 300px;
 }
 
 .video-element {
@@ -136,12 +145,12 @@
 /* Survey Section Styles */
 .survey-section {
   background: #000;
-  padding: 1.5rem;
+  padding: 1rem;
   border: 3px solid var(--neon-blue);
   box-shadow: 0 0 15px var(--neon-blue);
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
 .survey-section.neon-border-yellow {
@@ -152,39 +161,72 @@
 .question-header {
   text-align: center;
   border-bottom: 2px dashed #444;
-  padding-bottom: 1rem;
+  padding-bottom: 0.75rem;
 }
 
 .question-header h3 {
-  font-size: 0.8rem;
-  margin-bottom: 0.5rem;
+  font-size: 0.75rem;
+  margin-bottom: 0.4rem;
   letter-spacing: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.question-answered-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: var(--neon-yellow);
+  color: #000;
+  border-radius: 50%;
+  font-size: 0.9rem;
+  font-weight: bold;
+  box-shadow: 0 0 10px var(--neon-yellow), 0 0 20px var(--neon-yellow);
+  animation: checkmark-pop 0.4s ease-out;
+}
+
+@keyframes checkmark-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .question-header h4 {
-  font-size: 1.2rem;
+  font-size: 1rem;
   margin: 0;
 }
 
 .options-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .option-btn {
-  padding: 1rem;
+  padding: 0.75rem;
   background: #1a1a1a;
   border: 2px solid #333;
   color: #888;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.3s;
   text-transform: uppercase;
   letter-spacing: 1px;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.4rem;
   align-items: flex-start;
   text-align: left;
 }
@@ -197,15 +239,15 @@
 .option-exercise {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.25rem;
   width: 100%;
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
   border-top: 1px dashed #444;
 }
 
 .exercise-badge {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--neon-yellow);
   text-shadow: 0 0 5px var(--neon-yellow);
   font-weight: bold;
@@ -214,7 +256,7 @@
 }
 
 .exercise-specs {
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   color: #888;
   text-transform: none;
   letter-spacing: 0.5px;
@@ -264,12 +306,12 @@
 }
 
 .option-progress {
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
   border-top: 1px dashed #444;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.4rem;
   width: 100%;
 }
 

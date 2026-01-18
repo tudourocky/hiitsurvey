@@ -1151,7 +1151,7 @@ useEffect(() => {
 
       <div className="video-box-content">
         <div className="video-section">
-          <div className="video-wrapper-small">
+          <div className={`video-wrapper-small ${isActive ? 'video-wrapper-active' : ''}`}>
             <video ref={videoRef} autoPlay playsInline muted className="video-element" />
             <canvas ref={canvasRef} className="canvas-overlay" />
             {!isActive && !countdown && <div className="video-placeholder">WAITING FOR SIGNAL...</div>}
@@ -1236,7 +1236,12 @@ useEffect(() => {
           {!loadingSurvey && !loadingWorkout && !isSurveyComplete && survey && workout && workout.segments && workout.segments.length > 0 && currentQuestion && (
             <div className="survey-section neon-border-blue">
               <div className="question-header">
-                <h3 className="neon-text-pink">QUESTION {currentQuestionIndex + 1} / {survey.questions.length}</h3>
+                <h3 className="neon-text-pink">
+                  QUESTION {currentQuestionIndex + 1} / {survey.questions.length}
+                  {answers[currentQuestion.id] && (
+                    <span className="question-answered-indicator">✓</span>
+                  )}
+                </h3>
                 <h4 className="neon-text-blue">{currentQuestion.heading}</h4>
               </div>
 

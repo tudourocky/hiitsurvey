@@ -237,7 +237,7 @@ class ExerciseDetectionService:
         return False
     
     def detect_push_up(self, landmarks):
-        """Detect push-up exercise - requires body to be close to ground and horizontal"""
+        """Detect push-up exercise - more lenient, focuses on being on the ground"""
         left_shoulder = landmarks[PoseLandmark.LEFT_SHOULDER]
         left_elbow = landmarks[PoseLandmark.LEFT_ELBOW]
         left_wrist = landmarks[PoseLandmark.LEFT_WRIST]
@@ -246,6 +246,8 @@ class ExerciseDetectionService:
         right_wrist = landmarks[PoseLandmark.RIGHT_WRIST]
         left_hip = landmarks[PoseLandmark.LEFT_HIP]
         right_hip = landmarks[PoseLandmark.RIGHT_HIP]
+        left_knee = landmarks[PoseLandmark.LEFT_KNEE]
+        right_knee = landmarks[PoseLandmark.RIGHT_KNEE]
         left_ankle = landmarks[PoseLandmark.LEFT_ANKLE]
         right_ankle = landmarks[PoseLandmark.RIGHT_ANKLE]
         
@@ -254,50 +256,54 @@ class ExerciseDetectionService:
         right_angle = calculate_angle(right_shoulder, right_elbow, right_wrist)
         avg_angle = (left_angle + right_angle) / 2
         
-        # Check if in push-up position (hands below shoulders)
+        # Get body part positions
         wrist_y = (left_wrist.y + right_wrist.y) / 2
         shoulder_y = (left_shoulder.y + right_shoulder.y) / 2
         hip_y = (left_hip.y + right_hip.y) / 2
+        knee_y = (left_knee.y + right_knee.y) / 2
         ankle_y = (left_ankle.y + right_ankle.y) / 2
         
-        # Calculate body height from ground - use the lowest point (ankles or hips)
-        # In normalized coordinates: 0 = top of image, 1 = bottom of image
-        # Higher y values = lower on screen = closer to ground in real world
-        body_lowest_point = max(hip_y, ankle_y)
+        # KEY DISTINCTION: Push-ups are the ONLY exercise on the ground
+        # For exercises on the ground, ankles and knees should be very low (high y values)
+        # In normalized coordinates: 0 = top, 1 = bottom (higher y = lower on screen = closer to ground)
         
-        # For push-ups, body should be fully below 60% height mark (y > 0.6)
-        # This ensures person is close to ground in a proper push-up position
-        # Using 0.6 (60% from top) ensures they're in the lower portion of the frame
-        body_below_60_percent = body_lowest_point > 0.6
+        # PRIMARY CHECK: Ankles must be on/near the ground (very low in frame)
+        # This distinguishes from standing exercises (squats, jumping jacks, arm circles)
+        ankles_on_ground = ankle_y > 0.55  # Ankles must be below 55% mark (more lenient than before)
         
-        # DISTINGUISH FROM ARM CIRCLES:
-        # 1. Body must be horizontal (hips and shoulders at similar vertical positions)
-        #    In push-ups, body is horizontal. In arm circles (standing), hips are much lower than shoulders
-        body_horizontal = abs(hip_y - shoulder_y) < 0.15  # Hips and shoulders should be close in y-position
+        # SECONDARY CHECK: Knees should also be relatively low (not bent up like in squats)
+        # In push-ups, knees are on ground. In squats, knees are bent up (lower y values)
+        knees_low = knee_y > 0.45  # Knees should be below 45% mark
         
-        # 2. Wrists must be significantly below shoulders (not just slightly)
-        #    In arm circles, wrists might be at or above shoulder level. In push-ups, they're clearly below
-        wrists_significantly_below = (wrist_y - shoulder_y) > 0.12  # Wrists at least 12% below shoulders
+        # TERTIARY CHECK: Body should be relatively horizontal (to distinguish from standing)
+        # In push-ups: shoulders and hips are at similar height (horizontal)
+        # In standing exercises: hips are much lower than shoulders (vertical)
+        body_horizontal = abs(hip_y - shoulder_y) < 0.20  # More lenient: up to 20% difference
         
-        # 3. Shoulders should also be relatively low (not just the body lowest point)
-        #    This ensures person is in a prone/plank position, not standing
-        shoulders_also_low = shoulder_y > 0.5  # Shoulders should be below 50% height mark
+        # QUATERNARY CHECK: Overall body position should be low (distinguish from standing)
+        # Hips should be relatively low, indicating prone/plank position
+        hips_low = hip_y > 0.45  # Hips should be below 45% mark
+        
+        # FIFTH CHECK: Hands should be on ground (wrists below shoulders or at similar level)
+        # More lenient - just check wrists aren't way above shoulders
+        hands_on_ground = wrist_y >= shoulder_y - 0.10  # Wrists can be slightly above but not much
         
         state = self.exercise_states["push_up"]
         
-        # Must satisfy ALL conditions: push-up position, body below 60%, horizontal body alignment,
-        # wrists significantly below shoulders, and shoulders also low
-        if (wrist_y > shoulder_y and 
-            body_below_60_percent and 
+        # PRIMARY requirement: Must be on the ground (ankles on ground)
+        # SECONDARY: Body should be horizontal and low (distinguishes from standing)
+        if (ankles_on_ground and 
+            knees_low and 
             body_horizontal and 
-            wrists_significantly_below and 
-            shoulders_also_low):
-            # Detect push-up down (elbow bends)
-            if avg_angle < 90 and state["stage"] == "up":
+            hips_low and 
+            hands_on_ground):
+            
+            # Detect push-up down (elbow bends) - more lenient angle threshold
+            if avg_angle < 100 and state["stage"] == "up":  # More lenient: was 90, now 100
                 state["stage"] = "down"
             
-            # Detect push-up up (elbow straightens, rep complete)
-            if avg_angle > 160 and state["stage"] == "down":
+            # Detect push-up up (elbow straightens, rep complete) - more lenient angle threshold
+            if avg_angle > 150 and state["stage"] == "down":  # More lenient: was 160, now 150
                 state["stage"] = "up"
                 state["count"] += 1
                 return True
