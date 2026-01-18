@@ -700,8 +700,53 @@ useEffect(() => {
     // Check if we're on the last question - if so, mark survey as complete
     if (currentQuestionIndex >= survey.questions.length - 1) {
       console.log('[Auto-advance] On last question - survey complete!');
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
         setIsSurveyComplete(true);
+        
+        // Submit survey responses to backend/SurveyMonkey
+        try {
+          const answersList = Object.entries(answers).map(([questionId, answerText]) => ({
+            question_id: questionId,
+            answer: answerText
+          }));
+          
+          console.log(`[Survey Submission] Submitting ${answersList.length} answers for survey ${survey.id}`, answersList);
+          
+          const submitResponse = await fetch(`${API_URL}/surveys/${survey.id}/responses`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              survey_id: survey.id,
+              answers: answersList
+            })
+          });
+          
+          if (!submitResponse.ok) {
+            const errorText = await submitResponse.text();
+            console.error(`[Survey Submission] HTTP ${submitResponse.status}: ${errorText}`);
+            throw new Error(`HTTP ${submitResponse.status}: ${errorText}`);
+          }
+          
+          const result = await submitResponse.json();
+          
+          if (result.success) {
+            console.log('✓ Survey responses successfully submitted to SurveyMonkey', result);
+            if (result.response_id) {
+              console.log(`  Response ID: ${result.response_id}`);
+            }
+          } else {
+            console.warn('⚠ Survey submission failed:', result.message);
+            // Show user-friendly error message (optional)
+            alert(`Survey submission warning: ${result.message}`);
+          }
+        } catch (err) {
+          console.error('✗ Error submitting survey responses:', err);
+          // Don't block UI - survey is still marked complete even if submission fails
+          // Optionally show error to user
+          console.warn('Survey completed locally, but submission to SurveyMonkey failed. Check console for details.');
+        }
       }, 400); // Small delay to show completion
       return () => clearTimeout(timer);
     }
