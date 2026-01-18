@@ -40,18 +40,27 @@ async def process_frame(file: UploadFile = File(...)):
         # Process with MediaPipe Pose Landmarker (VIDEO mode for better performance)
         detection_result = pose_detection_service.detect_pose(mp_image)
         
+        # Only track the 4 hardcoded exercises: push_up, squat, jumping_jack, arm_circle
+        four_exercises = ["push_up", "squat", "jumping_jack", "arm_circle"]
+        
         if not detection_result.pose_landmarks or len(detection_result.pose_landmarks) == 0:
+            all_counters = exercise_detection_service.get_counters()
+            filtered_counters = {key: all_counters.get(key, 0) for key in four_exercises}
             return {
                 "detected": False,
-                "exercises": exercise_detection_service.get_counters(),
+                "exercises": filtered_counters,
                 "landmarks": None
             }
         
         # Get first pose landmarks
         landmarks = detection_result.pose_landmarks[0]
         
-        # Detect exercises
+        # Detect exercises (still detects all, but we'll filter the response)
         current_detections = exercise_detection_service.detect_all_exercises(landmarks)
+        
+        # Get all counters and filter to only the 4 we care about
+        all_counters = exercise_detection_service.get_counters()
+        filtered_counters = {key: all_counters.get(key, 0) for key in four_exercises}
         
         # Convert landmarks to list for JSON serialization
         landmarks_list = [
@@ -59,11 +68,14 @@ async def process_frame(file: UploadFile = File(...)):
             for lm in landmarks
         ]
         
+        # Filter current_detections to only the 4 exercises
+        filtered_current_detections = {key: current_detections.get(key, False) for key in four_exercises}
+        
         return {
             "detected": True,
-            "exercises": exercise_detection_service.get_counters(),
+            "exercises": filtered_counters,
             "landmarks": landmarks_list,
-            "current_detections": current_detections
+            "current_detections": filtered_current_detections
         }
     
     except Exception as e:
@@ -79,5 +91,7 @@ async def reset_counters():
 
 @router.get("/counters")
 async def get_counters():
-    """Get current exercise counters"""
-    return exercise_detection_service.get_counters()
+    """Get current exercise counters (only the 4 hardcoded exercises)"""
+    all_counters = exercise_detection_service.get_counters()
+    four_exercises = ["push_up", "squat", "jumping_jack", "arm_circle"]
+    return {key: all_counters.get(key, 0) for key in four_exercises}

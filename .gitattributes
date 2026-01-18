@@ -1,0 +1,10 @@
+# Ensure consistent line endings
+* text=auto
+
+# Version files should always use LF line endings
+.nvmrc text eol=lf
+.python-version text eol=lf
+
+# Lock files should always use LF line endings
+package-lock.json text eol=lf
+requirements.txt text eol=lf

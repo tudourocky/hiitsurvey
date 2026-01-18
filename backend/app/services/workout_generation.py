@@ -1,8 +1,5 @@
 """Workout generation service"""
-import json
-from typing import Optional
-from openai import OpenAI
-from app.config import OPENAI_API_KEY
+import random
 from app.models.workout import (
     WorkoutPreferences,
     GeneratedWorkout,
@@ -17,184 +14,43 @@ class WorkoutGenerationService:
     """Service for generating workout plans"""
     
     def __init__(self):
-        self.client = None
-        if OPENAI_API_KEY:
-            self.client = OpenAI(api_key=OPENAI_API_KEY)
+        pass
     
     def generate_workout(self, preferences: WorkoutPreferences, questions: list[SurveyQuestion]) -> GeneratedWorkout:
         """
-        Generate a workout plan based on preferences and survey questions.
-        Uses OpenAI API (gpt-4o-mini) if available, otherwise falls back to mock.
+        Generate a workout plan based on survey questions.
+        Ignores LLM and user preferences - always uses the 4 mandatory exercises with 10 reps each.
+        Maps exercises to survey options (truncates to max 4 options per question).
         """
-        # Try OpenAI API if configured
-        if self.client:
-            try:
-                return self._generate_with_openai(preferences, questions)
-            except Exception as e:
-                print(f"Error calling OpenAI API: {e}")
-                print("Falling back to mock workout generation...")
-                # Fall through to mock generation
-        
-        # Fallback to mock generation
+        # Skip LLM call entirely - just use mock generation
         return self._generate_mock_workout(preferences, questions)
     
-    def _generate_with_openai(self, preferences: WorkoutPreferences, questions: list[SurveyQuestion]) -> GeneratedWorkout:
-        """Generate workout using OpenAI API"""
-        # Build prompt
-        prompt = self._build_prompt(preferences, questions)
-        
-        # Call OpenAI API with cheap model
-        response = self.client.chat.completions.create(
-            model="gpt-4o-mini",  # Cheap model
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a fitness expert that generates personalized workout plans based on user preferences and survey responses. Always respond with valid JSON only."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            temperature=0.7,
-            response_format={"type": "json_object"}
-        )
-        
-        # Parse response
-        content = response.choices[0].message.content
-        workout_data = json.loads(content)
-        
-        # Convert to GeneratedWorkout model
-        return self._parse_openai_response(workout_data, preferences)
-    
-    def _build_prompt(self, preferences: WorkoutPreferences, questions: list[SurveyQuestion]) -> str:
-        """Build the prompt for OpenAI"""
-        questions_text = "\n".join([
-            f"Q{idx+1}: {q.question} (Type: {q.type}, Options: {', '.join(q.options) if q.options else 'N/A'})"
-            for idx, q in enumerate(questions)
-        ])
-        
-        prompt = f"""Generate a personalized workout plan based on the following preferences and survey questions.
-
-User Preferences:
-- Time: {preferences.time} minutes
-- Intensity: {preferences.intensity}
-- Body Part Focus: {preferences.body_part}
-- Available Equipment: {', '.join(preferences.equipment_available) if preferences.equipment_available else 'None specified'}
-
-Survey Questions:
-{questions_text}
-
-Instructions:
-1. For each multiple_choice question, create a workout segment that maps each option to a specific exercise
-2. For short_answer questions, create a break segment (is_break: true)
-3. Exercises should be appropriate for the body part focus and intensity level
-4. Use the equipment available if specified
-5. Distribute the {preferences.time} minutes across all segments appropriately
-
-Return a JSON object with this exact structure:
-{{
-    "total_duration": {preferences.time},
-    "segments": [
-        {{
-            "question_id": "q1",
-            "question": "Question text",
-            "question_type": "multiple_choice",
-            "is_break": false,
-            "option_exercise_mapping": [
-                {{
-                    "option": "Option text",
-                    "exercise": {{
-                        "name": "Exercise name",
-                        "reps": 10,
-                        "duration": null,
-                        "equipment": "equipment name or null"
-                    }}
-                }}
-            ],
-            "exercises": []
-        }}
-    ],
-    "summary": "Brief summary of the workout plan"
-}}
-
-Make sure the workout is engaging, appropriate for the intensity level, and uses the available equipment."""
-        
-        return prompt
-    
-    def _parse_openai_response(self, workout_data: dict, preferences: WorkoutPreferences) -> GeneratedWorkout:
-        """Parse OpenAI response into GeneratedWorkout model"""
-        segments = []
-        
-        for seg_data in workout_data.get("segments", []):
-            # Parse option_exercise_mapping
-            option_mappings = []
-            exercises_list = []
-            
-            for mapping_data in seg_data.get("option_exercise_mapping", []):
-                exercise_data = mapping_data.get("exercise", {})
-                exercise = Exercise(
-                    name=exercise_data.get("name", "Unknown"),
-                    sets=None,  # Sets removed - only using reps
-                    reps=exercise_data.get("reps"),
-                    duration=exercise_data.get("duration"),
-                    equipment=exercise_data.get("equipment")
-                )
-                option_mappings.append(ExerciseMapping(
-                    option=mapping_data.get("option", ""),
-                    exercise=exercise
-                ))
-                exercises_list.append(exercise)
-            
-            segment = WorkoutSegment(
-                question_id=seg_data.get("question_id", ""),
-                question=seg_data.get("question", ""),
-                question_type=seg_data.get("question_type", "multiple_choice"),
-                option_exercise_mapping=option_mappings,
-                exercises=exercises_list,
-                is_break=seg_data.get("is_break", False)
-            )
-            segments.append(segment)
-        
-        return GeneratedWorkout(
-            total_duration=workout_data.get("total_duration", preferences.time),
-            segments=segments,
-            summary=workout_data.get("summary", "Generated workout plan")
-        )
+    def _get_four_different_exercises(self, preferences: WorkoutPreferences = None) -> list[str]:
+        """
+        Get 4 hardcoded exercises that are easiest to detect and most visually distinct.
+        Ignores preferences - always returns the same 4 exercises:
+        1. Push-ups (upper body, pushing motion)
+        2. Squats (lower body, squatting motion)
+        3. Jumping Jacks (full body, jumping motion)
+        4. Arm Circles (upper body, circular arm motion)
+        """
+        # Always return these 4 exercises in the same order for every question
+        # These are the most distinct movements and easiest to detect
+        return ["Push-ups", "Squats", "Jumping Jacks", "Arm Circles"]
     
     def _generate_mock_workout(self, preferences: WorkoutPreferences, questions: list[SurveyQuestion]) -> GeneratedWorkout:
         """
-        Generate a workout plan based on preferences and survey questions.
-        Mock fallback when OpenAI API is not available.
+        Generate a workout plan based on survey questions.
+        Ignores user preferences - always uses the same 4 hardcoded exercises with fixed reps.
         """
         segments = []
-        total_exercises = len(questions)
         
-        # Map body parts to exercise categories
-        exercise_pool = {
-            "upper": ["Push-ups", "Plank", "Shoulder Press", "Bicep Curls", "Tricep Dips", "Pull-ups"],
-            "lower": ["Squats", "Lunges", "Jumping Jacks", "Calf Raises", "Leg Raises", "Wall Sit"],
-            "full": ["Burpees", "Mountain Climbers", "Jumping Jacks", "Plank", "Squats", "Push-ups"],
-            "arms": ["Bicep Curls", "Tricep Dips", "Push-ups", "Plank Hold", "Arm Circles"],
-            "legs": ["Squats", "Lunges", "Jumping Jacks", "Calf Raises", "Wall Sit"],
-            "core": ["Plank", "Sit-ups", "Crunches", "Russian Twists", "Leg Raises", "Mountain Climbers"]
-        }
+        # Fixed exercise configuration - ignore preferences
+        FIXED_REPS = 10  # Always 10 reps for all exercises
         
-        # Select exercises based on body part
-        available_exercises = exercise_pool.get(preferences.body_part.lower(), exercise_pool["full"])
+        # Get the 4 hardcoded exercises (same for every question)
+        four_exercises = self._get_four_different_exercises(preferences)
         
-        # Calculate exercise parameters based on intensity
-        intensity_multiplier = {
-            "low": {"reps": 5, "duration": 20},
-            "medium": {"reps": 10, "duration": 30},
-            "high": {"reps": 15, "duration": 45}
-        }
-        params = intensity_multiplier[preferences.intensity]
-        
-        # Time per segment (roughly distribute time across questions)
-        time_per_segment = preferences.time // total_exercises if total_exercises > 0 else preferences.time
-        
-        exercise_index = 0
         for i, question in enumerate(questions):
             if question.type == "short_answer":
                 # Short answer questions are breaks
@@ -206,35 +62,48 @@ Make sure the workout is engaging, appropriate for the intensity level, and uses
                     is_break=True
                 ))
             else:
-                # Multiple choice: assign different exercises to each option
+                # Multiple choice: randomly assign the 4 exercises to options (max 4 options)
                 option_mappings = []
                 exercises_list = []
-                for j, option in enumerate(question.options or []):
-                    exercise_name = available_exercises[exercise_index % len(available_exercises)]
+                
+                # Map each option to one of the 4 hardcoded exercises
+                options = question.options or []
+                # Truncate to max 4 options if there are more
+                num_options = min(len(options), 4)
+                truncated_options = options[:num_options]
+                
+                # Randomize the order of exercises for this question
+                shuffled_exercises = four_exercises.copy()
+                random.shuffle(shuffled_exercises)
+                
+                for j, option in enumerate(truncated_options):
+                    # Assign exercises in random order for this question
+                    exercise_name = shuffled_exercises[j]
                     exercise = Exercise(
                         name=exercise_name,
-                        sets=None,  # Sets removed - only using reps
-                        reps=params["reps"],
-                        equipment=None  # Could map from preferences.equipment_available
+                        sets=None,
+                        reps=FIXED_REPS,  # Always 10 reps
+                        equipment=None
                     )
                     # Create explicit mapping: option -> exercise
                     option_mappings.append(ExerciseMapping(option=option, exercise=exercise))
-                    exercises_list.append(exercise)
-                    exercise_index += 1
+                    # Add exercise to exercises_list (check by name to avoid duplicates)
+                    if not any(ex.name == exercise_name for ex in exercises_list):
+                        exercises_list.append(exercise)
                 
                 segments.append(WorkoutSegment(
                     question_id=question.id,
                     question=question.question,
                     question_type="multiple_choice",
                     option_exercise_mapping=option_mappings,
-                    exercises=exercises_list,  # Keep for backwards compatibility
+                    exercises=exercises_list,
                     is_break=False
                 ))
         
-        summary = f"Generated {len(segments)} workout segments for {preferences.time} minutes of {preferences.intensity} intensity {preferences.body_part} workout."
+        summary = f"Generated {len(segments)} workout segments using hardcoded exercises (Push-ups, Squats, Jumping Jacks, Arm Circles) with {FIXED_REPS} reps each."
         
         return GeneratedWorkout(
-            total_duration=preferences.time,
+            total_duration=preferences.time,  # Keep time from preferences for API compatibility
             segments=segments,
             summary=summary
         )
