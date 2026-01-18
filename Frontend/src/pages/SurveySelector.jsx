@@ -16,7 +16,6 @@ const ArcadeSurveySelector = () => {
   const [missions, setMissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [expandedDescriptions, setExpandedDescriptions] = useState(new Set());
 
   const params = new URLSearchParams(window.location.search);
   const role = params.get('role');
@@ -141,16 +140,16 @@ const ArcadeSurveySelector = () => {
       <div className="container">
       <div className="arcade-frame neon-border-blue">
         <div className="screen-content">
-          <h1 className="title neon-text-pink">MISSION SELECT</h1>
+          <h1 className="title neon-text-pink">TRACK SELECT</h1>
           <p className="subtitle">CHOOSE YOUR CHALLENGE</p>
           
           {loading ? (
             <div className="loading-container">
               <div className="loading-spinner"></div>
-              <p className="loading-text neon-text-blue">LOADING MISSIONS...</p>
+              <p className="loading-text neon-text-blue">LOADING EXERCISES...</p>
             </div>
           ) : missions.length === 0 ? (
-            <div className="loading-message">NO MISSIONS AVAILABLE</div>
+            <div className="loading-message">NO EXERCISES AVAILABLE</div>
           ) : (
             <div className="carousel-container" onWheel={handleWheel}>
               <button onClick={() => navigateCarousel(-1)} className="chevron left" aria-label="Previous">
@@ -172,28 +171,18 @@ const ArcadeSurveySelector = () => {
                       <div className="song-info">
                         <div className={`song-title ${isActive ? 'active' : ''}`}>{mission.title}</div>
                         <div className="song-artist">{mission.artist}</div>
-                        {mission.description && (
-                          <div 
-                            className={`song-description ${expandedDescriptions.has(mission.id) ? 'expanded' : ''}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setExpandedDescriptions(prev => {
-                                const next = new Set(prev);
-                                if (next.has(mission.id)) {
-                                  next.delete(mission.id);
-                                } else {
-                                  next.add(mission.id);
-                                }
-                                return next;
-                              });
-                            }}
-                          >
+                      </div>
+                      {mission.description && (
+                        <div className="description-screen">
+                          <div className="screen-header">MISSION DATA</div>
+                          <div className="screen-body">
                             <span className="description-text">
                               {mission.description}
                             </span>
                           </div>
-                        )}
-                      </div>
+                          <div className="screen-footer">REWARD: ACCESS GRANTED</div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
