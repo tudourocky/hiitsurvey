@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import './VideoBox.css';
-import { updateLeaderBoard } from './shared/supabase';
+import { client, updateLeaderBoard } from './shared/supabase';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -10,16 +10,6 @@ const VideoBox = ({ surveyId }) => {
   const streamRef = useRef(null);
   const animationFrameRef = useRef(null);
 
-  const leaderboardSubmittedRef = useRef(false);
-
-useEffect(() => {
-  if (!isSurveyComplete) return;
-  if (leaderboardSubmittedRef.current) return;
-
-  leaderboardSubmittedRef.current = true;
-
-  updateLeaderBoard();
-}, [isSurveyComplete]);
   
   const [isActive, setIsActive] = useState(false);
   // Only track the 4 hardcoded exercises: push_up, squat, jumping_jack, arm_circle
@@ -55,6 +45,64 @@ useEffect(() => {
   useEffect(() => {
     countersRef.current = counters;
   }, [counters]);
+
+  const leaderboardSubmittedRef = useRef(false);
+
+  // Reset submit guard when a different survey loads
+  useEffect(() => {
+    leaderboardSubmittedRef.current = false;
+  }, [surveyId]);
+
+  useEffect(() => {
+    if (!isSurveyComplete) return;
+    if (leaderboardSubmittedRef.current) return;
+
+    let cancelled = false;
+    let unsubscribeAuth = null;
+
+    const submit = async () => {
+      try {
+        const res = await updateLeaderBoard();
+        if (cancelled) return;
+
+        // If the user isn't logged in yet, wait for login then retry once.
+        if (res?.ok === false && res.reason === 'not_logged_in') {
+          const { data } = client.auth.onAuthStateChange(async (_event, session) => {
+            if (!session?.user) return;
+            if (leaderboardSubmittedRef.current) return;
+
+            try {
+              const retryRes = await updateLeaderBoard();
+              if (retryRes?.ok) {
+                leaderboardSubmittedRef.current = true;
+                window.dispatchEvent(new Event('leaderboard-updated'));
+              }
+            } catch (err) {
+              console.error('Leaderboard submit failed after login:', err);
+            } finally {
+              data.subscription.unsubscribe();
+            }
+          });
+
+          unsubscribeAuth = () => data.subscription.unsubscribe();
+          return;
+        }
+
+        leaderboardSubmittedRef.current = true;
+        window.dispatchEvent(new Event('leaderboard-updated'));
+      } catch (err) {
+        console.error('Leaderboard submit failed:', err);
+        leaderboardSubmittedRef.current = false;
+      }
+    };
+
+    submit();
+
+    return () => {
+      cancelled = true;
+      unsubscribeAuth?.();
+    };
+  }, [isSurveyComplete]);
 
   const startWebcam = async () => {
     try {

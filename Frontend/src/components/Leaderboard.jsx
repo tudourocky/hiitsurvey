@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { client, getTopUsers} from '../shared/supabase';
+import { useState, useEffect, useCallback } from 'react';
+import { client } from '../shared/supabase';
 import './Leaderboard.css';
 
 export default function Leaderboard() {
@@ -7,18 +7,17 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchLeaderboard();
-  }, []);
-
-  const fetchLeaderboard = async () => {
+  const fetchLeaderboard = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       
       // Fetch users sorted by score (descending)
       const {data, error} = await client 
         .from('Users')
         .select('*')
+        .order('score', { ascending: false })
+        .limit(10)
 
       if (error) throw error;
 
@@ -30,7 +29,18 @@ export default function Leaderboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchLeaderboard();
+
+    const onLeaderboardUpdated = () => {
+      fetchLeaderboard();
+    };
+
+    window.addEventListener('leaderboard-updated', onLeaderboardUpdated);
+    return () => window.removeEventListener('leaderboard-updated', onLeaderboardUpdated);
+  }, [fetchLeaderboard]);
 
 
   if (loading) {
@@ -95,19 +105,19 @@ export default function Leaderboard() {
                 <div className="table-cell name-col">
                   <div className="user-info">
                     <div className="user-avatar">
-                      {user.Name.charAt(0).toUpperCase()}
+                      {(user.Name ?? '?').charAt(0).toUpperCase()}
                     </div>
                     <span className="user-name">{user.Name}</span>
                   </div>
                 </div>
                 <div className="table-cell score-col">
                   <div className="score-badge">
-                    {user.score.toLocaleString()}
+                    {Number(user.score ?? 0).toLocaleString()}
                   </div>
                 </div>
                 <div className="table-cell surveys-col">
                   <div className="surveys-badge">
-                    {user.completed_surveys}
+                    {Number(user.completed_surveys ?? 0)}
                   </div>
                 </div>
               </div>
