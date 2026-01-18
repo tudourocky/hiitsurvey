@@ -10,7 +10,7 @@ class ExerciseDetectionService:
         # Exercise detection state
         self.exercise_states = {
             "squat": {"count": 0, "stage": "up", "prev_angle": 180},
-            "jumping_jack": {"count": 0, "stage": "closed", "prev_arm_distance": 0, "prev_leg_distance": 0},
+            "jumping_jack": {"count": 0, "stage": "closed", "prev_arm_distance": 0.2, "prev_leg_distance": 0.15},
             "burpee": {"count": 0, "stage": "standing", "prev_hip_y": 0},
             "mountain_climber": {"count": 0, "stage": "neutral", "prev_knee_y": 0, "knee_cycle": 0},
             "high_knee": {"count": 0, "stage": "down", "prev_left_knee_y": 0, "prev_right_knee_y": 0},
@@ -71,30 +71,61 @@ class ExerciseDetectionService:
         return False
     
     def detect_jumping_jack(self, landmarks):
-        """Detect jumping jack exercise"""
+        """Detect jumping jack exercise - slightly stricter to avoid walking false positives"""
         left_wrist = landmarks[PoseLandmark.LEFT_WRIST]
         right_wrist = landmarks[PoseLandmark.RIGHT_WRIST]
         left_ankle = landmarks[PoseLandmark.LEFT_ANKLE]
         right_ankle = landmarks[PoseLandmark.RIGHT_ANKLE]
         left_shoulder = landmarks[PoseLandmark.LEFT_SHOULDER]
+        right_shoulder = landmarks[PoseLandmark.RIGHT_SHOULDER]
         
+        # Simple distance calculations
         arm_distance = calculate_distance(left_wrist, right_wrist)
         leg_distance = calculate_distance(left_ankle, right_ankle)
-        wrist_height = (left_wrist.y + right_wrist.y) / 2
+        
+        # Check if arms are raised (helps distinguish from walking where arms swing lower)
+        avg_wrist_y = (left_wrist.y + right_wrist.y) / 2
+        avg_shoulder_y = (left_shoulder.y + right_shoulder.y) / 2
+        arms_raised = avg_wrist_y < avg_shoulder_y + 0.05  # Arms at or above shoulder level (lenient)
         
         state = self.exercise_states["jumping_jack"]
         
-        # Arms up and legs spread (open position)
-        if arm_distance > 0.3 and leg_distance > 0.2 and wrist_height < left_shoulder.y:
-            if state["stage"] == "closed":
-                state["stage"] = "open"
+        # Track previous distances to detect movement
+        prev_arm_dist = state.get("prev_arm_distance", 0.2)
+        prev_leg_dist = state.get("prev_leg_distance", 0.15)
         
-        # Arms down and legs together (closed position)
-        if arm_distance < 0.2 and leg_distance < 0.15:
-            if state["stage"] == "open":
+        # Slightly stricter thresholds to avoid walking false positives
+        # Open position: BOTH arms AND legs must be spread (not just one)
+        # This distinguishes jumping jacks from walking where movement is alternating
+        arms_spread = arm_distance > 0.28  # Slightly increased from 0.25
+        legs_spread = leg_distance > 0.20  # Slightly increased from 0.18
+        
+        # Closed position: both arms AND legs close together
+        arms_close = arm_distance < 0.22
+        legs_close = leg_distance < 0.16
+        
+        # Simple state machine - similar to squat detection
+        if state["stage"] == "closed":
+            # Transition to open: BOTH arms AND legs spread, AND arms raised
+            # This prevents walking from triggering (walking has alternating movement, arms not raised)
+            if arms_spread and legs_spread and arms_raised:
+                state["stage"] = "open"
+                state["prev_arm_distance"] = arm_distance
+                state["prev_leg_distance"] = leg_distance
+        
+        elif state["stage"] == "open":
+            # Transition to closed: both arms AND legs close together
+            # Count a rep when returning to closed position
+            if arms_close and legs_close:
                 state["stage"] = "closed"
                 state["count"] += 1
+                state["prev_arm_distance"] = arm_distance
+                state["prev_leg_distance"] = leg_distance
                 return True
+        
+        # Update previous distances for next frame
+        state["prev_arm_distance"] = arm_distance
+        state["prev_leg_distance"] = leg_distance
         
         return False
     

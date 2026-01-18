@@ -10,9 +10,12 @@ const VideoBox = ({ surveyId }) => {
   const animationFrameRef = useRef(null);
   
   const [isActive, setIsActive] = useState(false);
+  // Only track the 4 hardcoded exercises: push_up, squat, jumping_jack, plank
   const [counters, setCounters] = useState({
-    squat: 0, jumping_jack: 0, burpee: 0, mountain_climber: 0,
-    high_knee: 0, push_up: 0, lunge: 0, plank: 0, jump_squat: 0, star_jump: 0
+    push_up: 0,
+    squat: 0,
+    jumping_jack: 0,
+    plank: 0
   });
   const [detecting, setDetecting] = useState(false);
   const [error, setError] = useState(null);
@@ -26,26 +29,59 @@ const VideoBox = ({ surveyId }) => {
   const [isExerciseComplete, setIsExerciseComplete] = useState(false);
   const [loadingSurvey, setLoadingSurvey] = useState(false);
   const [loadingWorkout, setLoadingWorkout] = useState(false);
+  const [landmarks, setLandmarks] = useState(null);
 
   const startWebcam = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+      setError(null);
+      setDetecting(true);
+      
+      // Stop any existing stream first
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: { ideal: 640 }, 
+          height: { ideal: 480 },
+          facingMode: 'user'
+        } 
+      });
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
-        setIsActive(true);
-        setError(null);
         
-        // Wait for video metadata to load
+        // Wait for video metadata to load before setting isActive
         videoRef.current.onloadedmetadata = () => {
-          if (canvasRef.current && videoRef.current) {
+          if (canvasRef.current && videoRef.current && videoRef.current.readyState >= 2) {
             canvasRef.current.width = videoRef.current.videoWidth;
             canvasRef.current.height = videoRef.current.videoHeight;
+            // Only set active after video is ready
+            setIsActive(true);
+            setDetecting(false);
           }
         };
+        
+        // Fallback: if onloadedmetadata doesn't fire, wait a bit then check
+        setTimeout(() => {
+          if (videoRef.current && videoRef.current.readyState >= 2 && !isActive) {
+            if (canvasRef.current) {
+              canvasRef.current.width = videoRef.current.videoWidth;
+              canvasRef.current.height = videoRef.current.videoHeight;
+            }
+            setIsActive(true);
+            setDetecting(false);
+          }
+        }, 1000);
       }
     } catch (err) {
       setError('CAMERA ERROR: ' + err.message);
+      setDetecting(false);
+      setIsActive(false);
+      console.error('Error starting camera:', err);
     }
   };
 
@@ -64,6 +100,7 @@ const VideoBox = ({ surveyId }) => {
     }
     setIsActive(false);
     setDetecting(false);
+    setLandmarks(null);
   };
 
   const resetCounters = async () => {
@@ -129,10 +166,93 @@ const VideoBox = ({ surveyId }) => {
     return 'squat';
   };
 
+  // Function to draw pose landmarks on canvas
+  const drawLandmarks = useCallback((ctx, landmarks, width, height) => {
+    if (!landmarks || landmarks.length === 0) return;
+    
+    // Pose connections (skeleton structure)
+    const connections = [
+      // Face
+      [0, 1], [1, 2], [2, 3], [3, 7],  // Left eye
+      [0, 4], [4, 5], [5, 6], [6, 8],  // Right eye
+      [0, 9], [0, 10],  // Nose to mouth
+      // Upper body
+      [11, 12],  // Shoulders
+      [11, 13], [13, 15],  // Left arm
+      [12, 14], [14, 16],  // Right arm
+      [15, 17], [15, 19], [15, 21],  // Left hand
+      [16, 18], [16, 20], [16, 22],  // Right hand
+      // Torso
+      [11, 23], [12, 24],  // Shoulders to hips
+      [23, 24],  // Hips
+      // Lower body
+      [23, 25], [25, 27],  // Left leg
+      [24, 26], [26, 28],  // Right leg
+      [27, 29], [27, 31],  // Left foot
+      [28, 30], [28, 32],  // Right foot
+    ];
+    
+    // Draw connections (skeleton) in green
+    ctx.strokeStyle = '#00ff00';
+    ctx.lineWidth = 2;
+    connections.forEach(([start, end]) => {
+      if (landmarks[start] && landmarks[end]) {
+        const startLandmark = landmarks[start];
+        const endLandmark = landmarks[end];
+        
+        // Only draw if visibility is good enough
+        if (startLandmark.visibility > 0.5 && endLandmark.visibility > 0.5) {
+          const startX = startLandmark.x * width;
+          const startY = startLandmark.y * height;
+          const endX = endLandmark.x * width;
+          const endY = endLandmark.y * height;
+          
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+        }
+      }
+    });
+    
+    // Draw landmarks as green circles
+    landmarks.forEach((landmark, index) => {
+      if (landmark.visibility > 0.5) {
+        const x = landmark.x * width;
+        const y = landmark.y * height;
+        
+        // Draw circle
+        ctx.fillStyle = '#00ff00';
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        // Add glow effect
+        ctx.shadowColor = '#00ff00';
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    });
+  }, []);
+
   // Process video frames and detect exercises (throttled to ~10fps)
   const lastFrameTime = useRef(0);
   const processFrame = useCallback(async () => {
-    if (!isActive || !videoRef.current || !canvasRef.current) return;
+    // Check if we should continue processing
+    if (!isActive || !videoRef.current || !canvasRef.current) {
+      return;
+    }
+    
+    // Check if video is ready
+    const video = videoRef.current;
+    if (video.readyState < video.HAVE_CURRENT_DATA) {
+      // Video not ready yet, wait and try again
+      animationFrameRef.current = requestAnimationFrame(processFrame);
+      return;
+    }
     
     const now = Date.now();
     // Throttle to ~10fps (100ms between frames)
@@ -142,15 +262,25 @@ const VideoBox = ({ surveyId }) => {
     }
     lastFrameTime.current = now;
     
-    const video = videoRef.current;
     const canvas = canvasRef.current;
     
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+    if (video.readyState >= video.HAVE_CURRENT_DATA) {
+      // Only set canvas dimensions if they've changed (to avoid clearing)
+      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+      }
       
       const ctx = canvas.getContext('2d');
+      
+      // Clear and draw video frame
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Draw landmarks if available (from previous frame response)
+      if (landmarks && Array.isArray(landmarks) && landmarks.length > 0) {
+        drawLandmarks(ctx, landmarks, canvas.width, canvas.height);
+      }
       
       // Convert canvas to blob and send to backend
       canvas.toBlob(async (blob) => {
@@ -176,18 +306,51 @@ const VideoBox = ({ surveyId }) => {
           const data = await response.json();
           
           if (data.exercises) {
+            // Backend now only returns the 4 hardcoded exercises: push_up, squat, jumping_jack, plank
             setCounters(data.exercises);
+          }
+          
+          // Store landmarks for drawing (use detected flag or check if landmarks exist)
+          if (data.landmarks && (data.detected === true || data.landmarks.length > 0)) {
+            setLandmarks(data.landmarks);
+            // Redraw canvas with landmarks immediately after receiving them
+            if (canvasRef.current && videoRef.current && videoRef.current.readyState >= 2) {
+              const canvas = canvasRef.current;
+              const video = videoRef.current;
+              
+              // Ensure canvas dimensions match video
+              if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+              }
+              
+              const ctx = canvas.getContext('2d');
+              // Redraw video frame
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              // Draw new landmarks
+              drawLandmarks(ctx, data.landmarks, canvas.width, canvas.height);
+            }
+          } else {
+            setLandmarks(null);
           }
         } catch (err) {
           console.error('Error processing frame:', err);
+          // On error, still continue processing but maybe slow down
+          // Don't break the loop
         } finally {
-          animationFrameRef.current = requestAnimationFrame(processFrame);
+          // Always continue processing if still active
+          if (isActive && videoRef.current && canvasRef.current) {
+            animationFrameRef.current = requestAnimationFrame(processFrame);
+          }
         }
       }, 'image/jpeg', 0.8);
     } else {
-      animationFrameRef.current = requestAnimationFrame(processFrame);
+      // Video not ready yet, wait a bit longer and try again
+      if (isActive && videoRef.current) {
+        animationFrameRef.current = requestAnimationFrame(processFrame);
+      }
     }
-  }, [isActive]);
+  }, [isActive, landmarks, drawLandmarks]);
 
   // Start/stop frame processing
   useEffect(() => {
@@ -204,7 +367,7 @@ const VideoBox = ({ surveyId }) => {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [isActive, processFrame]);
+  }, [isActive, processFrame, landmarks, drawLandmarks]);
 
   // Track reps for selected exercise
   useEffect(() => {
@@ -512,7 +675,13 @@ const VideoBox = ({ surveyId }) => {
           </div>
           <div className="video-controls">
             {!isActive ? (
-              <button onClick={startWebcam} className="btn-start">START CAMERA</button>
+              <button 
+                onClick={startWebcam} 
+                className="btn-start"
+                disabled={detecting}
+              >
+                {detecting ? 'LOADING...' : 'START CAMERA'}
+              </button>
             ) : (
               <button onClick={stopWebcam} className="btn-stop">STOP CAMERA</button>
             )}
@@ -668,12 +837,21 @@ const VideoBox = ({ surveyId }) => {
         <aside className="counters-section neon-border-blue">
           <h2>STATS</h2>
           <div className="counters-grid">
-            {Object.entries(counters).map(([key, val]) => (
-              <div key={key} className={`counter-card ${key}`}>
-                <span className="counter-label">{key.replace('_', ' ').toUpperCase()}</span>
-                <span className="counter-value">{val}</span>
-              </div>
-            ))}
+            {Object.entries(counters).map(([key, val]) => {
+              // Map exercise keys to display names
+              const displayNames = {
+                'push_up': 'PUSH-UPS',
+                'squat': 'SQUATS',
+                'jumping_jack': 'JUMPING JACKS',
+                'plank': 'PLANK'
+              };
+              return (
+                <div key={key} className={`counter-card ${key}`}>
+                  <span className="counter-label">{displayNames[key] || key.replace('_', ' ').toUpperCase()}</span>
+                  <span className="counter-value">{val}</span>
+                </div>
+              );
+            })}
           </div>
           <div className="total-section">
             <div className="total-label">TOTAL REPS</div>
