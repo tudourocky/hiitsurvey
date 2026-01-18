@@ -4,11 +4,11 @@ export const client = createClient(import.meta.env.VITE_SUPABASE_URL,import.meta
 
 export var user = await client.auth.getUser();
 
-export const signInWithGoogle = async (role ) => {
+export const signInWithGoogle = async () => {
   const {error } = await client.auth.signInWithOAuth({
     provider: 'google',
     options:{
-        redirectTo: `http://localhost:5173/?role=${role}`
+        redirectTo: "http://localhost:5173/"
     }
   });
   
@@ -100,4 +100,13 @@ export const goDown = async(ids) => {
     .select("*")
   return data;
 
+}
+
+export const updateLeaderBoard = async() => { 
+  const {user} = await client.auth.getUser();
+
+  if (!user) return ;
+
+  const {data, error} = await client.rpc("increment_user_score");
+  
 }

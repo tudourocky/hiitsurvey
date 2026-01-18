@@ -16,7 +16,7 @@ export default function SignIn() {
           <button
             className={`toggle-btn`}
             onClick={() => {
-                window.location.href=`http://localhost:5173/surveys/?role="surveyor"`
+                window.location.href=`http://localhost:5173/surveys/?role=surveyor`
             } }
           >
             <svg className="toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -26,7 +26,7 @@ export default function SignIn() {
           </button>
           <button
             className={`toggle-btn `}
-            onClick={() => {signInWithGoogle('surveyee');}}
+            onClick={() => {signInWithGoogle();}}
           >
             <svg className="toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />

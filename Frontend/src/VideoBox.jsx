@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import './VideoBox.css';
+import { updateLeaderBoard } from './shared/supabase';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -8,6 +9,17 @@ const VideoBox = ({ surveyId }) => {
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const animationFrameRef = useRef(null);
+
+  const leaderboardSubmittedRef = useRef(false);
+
+useEffect(() => {
+  if (!isSurveyComplete) return;
+  if (leaderboardSubmittedRef.current) return;
+
+  leaderboardSubmittedRef.current = true;
+
+  updateLeaderBoard();
+}, [isSurveyComplete]);
   
   const [isActive, setIsActive] = useState(false);
   // Only track the 4 hardcoded exercises: push_up, squat, jumping_jack, arm_circle
