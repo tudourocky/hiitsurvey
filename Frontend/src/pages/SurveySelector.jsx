@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import "./SurveySelector.css"
 import ChevronSVG from '../ChevronSVG';
 import Navbar from "../components/Navbar"
+import Leaderboard from '../components/Leaderboard';
 import * as FaIcons from 'react-icons/fa';
 import * as MdIcons from 'react-icons/md';
 import * as FiIcons from 'react-icons/fi';
@@ -92,7 +93,7 @@ const ArcadeSurveySelector = () => {
   const handleWheel = (e) => {
     if (wheelLock.current) return;
     wheelLock.current = true;
-    if (e.deltaX < 0) navigateCarousel(-1);
+    if (e.deltaX < 0 || e.deltaY < 0) navigateCarousel(-1);
     else navigateCarousel(1);
     setTimeout(() => { wheelLock.current = false; }, 300);
   }
@@ -126,6 +127,8 @@ const ArcadeSurveySelector = () => {
   return (
     <div className="arcade-container scanlines">
       <Navbar />
+      <div className="container">
+        <Leaderboard />
       <div className="arcade-frame neon-border-blue">
         <div className="screen-content">
           <h1 className="title neon-text-pink">MISSION SELECT</h1>
@@ -170,10 +173,11 @@ const ArcadeSurveySelector = () => {
             </div>
           )}
 
-          <div className="controls">
+            <div className="controls">
+            </div>
           </div>
         </div>
-      </div>
+        </div>
     </div>
   );
 };
