@@ -282,6 +282,7 @@ export const RewardProvider = ({ children }) => {
     canEarnReward,
     isWorkoutCompletedToday,
     completeWorkout,
+    setPoints,
     REWARD_CONFIG,
     BADGES
   };

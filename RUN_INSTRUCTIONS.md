@@ -43,10 +43,16 @@ The frontend works standalone with localStorage, but if you want to run the back
 
 4. **Run the FastAPI server:**
    ```bash
+   # Using the entry point (backward compatible)
    uvicorn main:app --reload
+   
+   # Or using the new modular structure directly
+   uvicorn app.main:app --reload
    ```
 
    The API will be available at `http://localhost:8000`
+   
+   **Note:** The backend has been refactored into a modular structure. See `backend/STRUCTURE.md` for details.
 
 ## Quick Start (Frontend Only)
 
