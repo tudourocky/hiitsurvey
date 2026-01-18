@@ -27,6 +27,7 @@ const VideoBox = ({ surveyId }) => {
   const [currentExerciseReps, setCurrentExerciseReps] = useState(0);
   const [previousCounters, setPreviousCounters] = useState({});
   const [isExerciseComplete, setIsExerciseComplete] = useState(false);
+  const [isSurveyComplete, setIsSurveyComplete] = useState(false); // Track if all questions are done
   const [lockedAnswers, setLockedAnswers] = useState({}); // Track which questions have locked answers
   const [loadingSurvey, setLoadingSurvey] = useState(false);
   const [loadingWorkout, setLoadingWorkout] = useState(false);
@@ -36,6 +37,12 @@ const VideoBox = ({ surveyId }) => {
   const baselineCountersRef = useRef({ push_up: 0, squat: 0, jumping_jack: 0, arm_circle: 0 }); // Baseline when question started
   const currentExerciseKeyRef = useRef(null); // Current exercise counter key
   const lastBaselineQuestionRef = useRef(-1); // Track which question baseline was set for
+  const countersRef = useRef(counters); // Keep latest counters in ref for use in timeout callbacks
+
+  // Keep countersRef in sync with counters state
+  useEffect(() => {
+    countersRef.current = counters;
+  }, [counters]);
 
   const startWebcam = async () => {
     try {
@@ -639,31 +646,42 @@ const VideoBox = ({ surveyId }) => {
     
     console.log(`[Auto-advance] Exercise complete! Current question: ${currentQuestionIndex}`);
     
-    // Check if we're not on the last question
+    // Check if we're on the last question - if so, mark survey as complete
     if (currentQuestionIndex >= survey.questions.length - 1) {
-      console.log('[Auto-advance] On last question - not advancing');
-      return;
+      console.log('[Auto-advance] On last question - survey complete!');
+      const timer = setTimeout(() => {
+        setIsSurveyComplete(true);
+      }, 400); // Small delay to show completion
+      return () => clearTimeout(timer);
     }
     
     // Wait a moment before auto-advancing to show completion
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       console.log('[Auto-advance] Advancing to next question...');
       
-      // Capture current counter values as baseline for next question BEFORE advancing
-      const newBaseline = {
-        push_up: counters.push_up || 0,
-        squat: counters.squat || 0,
-        jumping_jack: counters.jumping_jack || 0,
-        arm_circle: counters.arm_circle || 0
-      };
+      // Reset counters to 0 when advancing to next question
+      try {
+        await fetch(`${API_URL}/api/reset-counters`, { method: 'POST' });
+        const zeroCounters = { push_up: 0, squat: 0, jumping_jack: 0, arm_circle: 0 };
+        setCounters(zeroCounters);
+        countersRef.current = zeroCounters;
+        baselineCountersRef.current = { ...zeroCounters };
+        console.log('[Auto-advance] Counters reset to 0');
+      } catch (err) {
+        console.error('Error resetting counters on advance:', err);
+        // Continue with advance even if reset fails
+        const zeroCounters = { push_up: 0, squat: 0, jumping_jack: 0, arm_circle: 0 };
+        setCounters(zeroCounters);
+        countersRef.current = zeroCounters;
+        baselineCountersRef.current = { ...zeroCounters };
+      }
       
       // Get next question index before updating state
       const nextQuestionIndex = currentQuestionIndex + 1;
       
-      // Update the baseline ref for next question and mark it as set
-      baselineCountersRef.current = { ...newBaseline };
+      // Update the baseline ref for next question and mark it as set (already set to zero above)
       lastBaselineQuestionRef.current = nextQuestionIndex;
-      console.log(`[Auto-advance] Set baseline for question ${nextQuestionIndex}:`, newBaseline);
+      console.log(`[Auto-advance] Set baseline for question ${nextQuestionIndex}:`, baselineCountersRef.current);
       const nextQuestion = survey.questions[nextQuestionIndex];
       
       // Advance to next question
@@ -671,7 +689,7 @@ const VideoBox = ({ surveyId }) => {
       setCurrentExerciseReps(0);
       setIsExerciseComplete(false);
       setSelectedExercise(null);
-      setPreviousCounters(newBaseline);
+      setPreviousCounters({ ...baselineCountersRef.current });
       setError(null);
       
       // Clear answer for next question
@@ -697,7 +715,9 @@ const VideoBox = ({ surveyId }) => {
     }, 400); // 0.4 second delay to show completion
     
     return () => clearTimeout(timer);
-  }, [isExerciseComplete, survey, currentQuestionIndex, isActive, counters]);
+    // Remove 'counters' from dependencies - we only want to advance when isExerciseComplete changes
+    // Including 'counters' causes the effect to re-run every time counters update, resetting the timer
+  }, [isExerciseComplete, survey, currentQuestionIndex, isActive]);
 
   // Auto-select answer based on first exercise detected
   useEffect(() => {
@@ -1095,8 +1115,29 @@ const VideoBox = ({ surveyId }) => {
             </div>
           )}
 
-          {/* Survey Questions Section - Only show when everything is ready */}
-          {!loadingSurvey && !loadingWorkout && survey && workout && workout.segments && workout.segments.length > 0 && currentQuestion && (
+          {/* Survey Completion Success Message */}
+          {isSurveyComplete && survey && (
+            <div className="survey-section neon-border-yellow">
+              <div className="completion-message">
+                <h2 className="neon-text-yellow completion-title">🎉 SURVEY COMPLETE! 🎉</h2>
+                <p className="completion-text">You've successfully completed all {survey.questions.length} questions!</p>
+                <p className="completion-subtext">Well done, champion! Your responses have been recorded.</p>
+                <div className="completion-stats">
+                  <div className="stat-item">
+                    <span className="stat-label">Questions Completed:</span>
+                    <span className="stat-value">{survey.questions.length} / {survey.questions.length}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Total Reps:</span>
+                    <span className="stat-value">{Object.values(counters).reduce((a, b) => a + b, 0)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Survey Questions Section - Only show when everything is ready and not complete */}
+          {!loadingSurvey && !loadingWorkout && !isSurveyComplete && survey && workout && workout.segments && workout.segments.length > 0 && currentQuestion && (
             <div className="survey-section neon-border-blue">
               <div className="question-header">
                 <h3 className="neon-text-pink">QUESTION {currentQuestionIndex + 1} / {survey.questions.length}</h3>
