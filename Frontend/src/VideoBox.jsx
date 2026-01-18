@@ -95,9 +95,29 @@ const VideoBox = ({ surveyId }) => {
         }, 1000);
       }
     } catch (err) {
-      setError('CAMERA ERROR: ' + err.message);
       setDetecting(false);
       setIsActive(false);
+      
+      // Provide user-friendly error messages based on error type
+      let errorMessage = 'CAMERA ERROR: ';
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        errorMessage = '⚠️ CAMERA PERMISSION DENIED\n\n';
+        errorMessage += 'Please allow camera access to use this feature.\n\n';
+        errorMessage += 'How to enable:\n';
+        errorMessage += '1. Click the camera icon in your browser\'s address bar\n';
+        errorMessage += '2. Select "Allow" for camera permissions\n';
+        errorMessage += '3. Refresh the page and try again';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        errorMessage = '⚠️ CAMERA NOT FOUND\n\n';
+        errorMessage += 'No camera device detected. Please connect a camera and try again.';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        errorMessage = '⚠️ CAMERA IN USE\n\n';
+        errorMessage += 'Camera is already being used by another application. Please close other apps using the camera.';
+      } else {
+        errorMessage += err.message || 'Unknown error occurred';
+      }
+      
+      setError(errorMessage);
       console.error('Error starting camera:', err);
     }
   };
@@ -149,6 +169,25 @@ const VideoBox = ({ surveyId }) => {
       setCurrentExerciseReps(0);
       setPreviousCounters({});
       setIsExerciseComplete(false);
+      
+      // Unlock the current question's answer so user can select a different exercise
+      const currentQuestion = survey?.questions[currentQuestionIndex];
+      if (currentQuestion && currentQuestion.id) {
+        setLockedAnswers(prev => {
+          const newLocked = { ...prev };
+          delete newLocked[currentQuestion.id];
+          return newLocked;
+        });
+        // Clear the answer for the current question
+        setAnswers(prev => {
+          const newAnswers = { ...prev };
+          delete newAnswers[currentQuestion.id];
+          return newAnswers;
+        });
+        // Reset exercise selection
+        setSelectedExercise(null);
+        console.log('[Reset] Unlocked answer for question', currentQuestion.id);
+      }
     } catch (err) {
       console.error('Error resetting counters:', err);
     }
