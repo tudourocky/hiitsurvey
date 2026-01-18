@@ -8,6 +8,7 @@ import PreferenceForm from './pages/PreferenceForm';
 import Rewards from './pages/Rewards';
 import ArcadeSurveySelector from './pages/SurveySelector';
 import Exercise from './pages/Exercise';
+import SignIn from './pages/SignIn';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <Route path="/rewards" element={<Rewards />} />
         <Route path="/surveys" element={<ArcadeSurveySelector />} />
         <Route path="/exercise" element={<Exercise />} />
+        <Route path="/signin" element={<SignIn />} />
         {/* Catch-all route for 404 */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import "./SurveySelector.css"
 import ChevronSVG from '../ChevronSVG';
 import Navbar from "../components/Navbar"
+import Leaderboard from '../components/Leaderboard';
 
 const ArcadeSurveySelector = () => {
   const navigate = useNavigate();
@@ -69,7 +70,7 @@ const ArcadeSurveySelector = () => {
   const handleWheel = (e) => {
     if (wheelLock.current) return;
     wheelLock.current = true;
-    if (e.deltaX < 0) navigateCarousel(-1);
+    if (e.deltaX < 0 || e.deltaY < 0) navigateCarousel(-1);
     else navigateCarousel(1);
     setTimeout(() => { wheelLock.current = false; }, 300);
   }
@@ -77,43 +78,46 @@ const ArcadeSurveySelector = () => {
   return (
     <div className="arcade-container scanlines">
       <Navbar />
-      <div className="arcade-frame neon-border-blue">
-        <div className="screen-content">
-          <h1 className="title neon-text-pink">MISSION SELECT</h1>
-          <p className="subtitle">CHOOSE YOUR CHALLENGE</p>
-          
-          <div className="carousel-container" onWheel={handleWheel}>
-            <button onClick={() => navigateCarousel(-1)} className="chevron left" aria-label="Previous">
-              <ChevronSVG direction="left" size={48} />
-            </button>
-            <div className="carousel">
-              {songs.map((song, index) => {
-                const isActive = index === currentIndex;
-                return (
-                  <div
-                    key={index}
-                    onClick={handleCardClick}
-                    className={`card ${isActive ? 'card-active' : ''}`}
-                    style={{ ...getCardStyle(index), cursor: 'pointer' }}
-                  >
-                    <div className={`album-art ${isActive ? 'active' : '' }`} style={{ background: song.color }}>{song.icon}</div>
-                    <div className="song-info">
-                      <div className={`song-title ${isActive ? 'active' : ''}`}>{song.title}</div>
-                      <div className="song-artist">{song.artist}</div>
+      <div className="container">
+        <Leaderboard />
+        <div className="arcade-frame neon-border-blue">
+          <div className="screen-content">
+            <h1 className="title neon-text-pink">MISSION SELECT</h1>
+            <p className="subtitle">CHOOSE YOUR CHALLENGE</p>
+            
+            <div className="carousel-container" onWheel={handleWheel}>
+              <button onClick={() => navigateCarousel(-1)} className="chevron left" aria-label="Previous">
+                <ChevronSVG direction="left" size={48} />
+              </button>
+              <div className="carousel">
+                {songs.map((song, index) => {
+                  const isActive = index === currentIndex;
+                  return (
+                    <div
+                      key={index}
+                      onClick={handleCardClick}
+                      className={`card ${isActive ? 'card-active' : ''}`}
+                      style={{ ...getCardStyle(index), cursor: 'pointer' }}
+                    >
+                      <div className={`album-art ${isActive ? 'active' : '' }`} style={{ background: song.color }}>{song.icon}</div>
+                      <div className="song-info">
+                        <div className={`song-title ${isActive ? 'active' : ''}`}>{song.title}</div>
+                        <div className="song-artist">{song.artist}</div>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+              <button onClick={() => navigateCarousel(+1)} className="chevron right" aria-label="Next">
+                <ChevronSVG direction="right" size={48} />
+              </button>
             </div>
-            <button onClick={() => navigateCarousel(+1)} className="chevron right" aria-label="Next">
-              <ChevronSVG direction="right" size={48} />
-            </button>
-          </div>
 
-          <div className="controls">
+            <div className="controls">
+            </div>
           </div>
         </div>
-      </div>
+        </div>
     </div>
   );
 };

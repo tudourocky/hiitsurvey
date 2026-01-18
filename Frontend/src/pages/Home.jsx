@@ -1,9 +1,23 @@
 import React from "react";
 import Navbar from "../components/Navbar";
 import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { client, insertUser} from "../shared/supabase";
 
 export default function Home() {
   const navigate = useNavigate();
+    const date = new Date();
+
+// Listen for future sign-ins
+useEffect(()=> {
+    const params = new URLSearchParams(window.location.search);
+    const role = params.get('role');
+
+    if (role){
+        // Fetch user
+        insertUser(role);
+    
+    }}, [])
 
   return (
     <div className="arcade-container scanlines">
@@ -13,7 +27,7 @@ export default function Home() {
           <div className="retro-header">
             <span className="retro-text">RETRO</span>
             <div className="pacman-icon">ᗧ</div>
-            <span className="date-text">JUL 22ND</span>
+            <span className="date-text">{date.toLocaleDateString('en-US', {weekday: 'short'}) + " " + date.getDate()}</span>
           </div>
           
           <h1 className="arcade-title">ARCADE</h1>
