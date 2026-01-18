@@ -6,6 +6,19 @@
   perspective: 1000px;
   margin: 1rem 0 0 0;
 }
+.button-list{
+  display: flex;
+  flex-direction: row;
+}
+.survey-meta{
+  display: flex;
+  flex-direction: row;
+  gap: 50px;
+}
+.survey-button.active{
+  background-color: var(--neon-blue);
+  z-index: 10;
+}
 .container{
   display:flex;
   flex-direction: column;

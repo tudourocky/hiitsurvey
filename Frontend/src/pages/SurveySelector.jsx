@@ -7,6 +7,7 @@ import Leaderboard from '../components/Leaderboard';
 import * as FaIcons from 'react-icons/fa';
 import * as MdIcons from 'react-icons/md';
 import * as FiIcons from 'react-icons/fi';
+import SurveyList from '../components/SurveyList';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -16,6 +17,9 @@ const ArcadeSurveySelector = () => {
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [expandedDescriptions, setExpandedDescriptions] = useState(new Set());
+
+  const params = new URLSearchParams(window.location.search);
+  const role = params.get('role');
 
   // Fetch missions from backend
   useEffect(() => {
@@ -124,7 +128,13 @@ const ArcadeSurveySelector = () => {
     // Fallback
     return <FaIcons.FaCircle />;
   };
+  if(role) {
+    return (
+      <SurveyList />
+    )
+  }
 
+  else{
   return (
     <div className="arcade-container scanlines">
       <Navbar />
@@ -202,6 +212,7 @@ const ArcadeSurveySelector = () => {
         </div>
     </div>
   );
+}
 };
 
 export default ArcadeSurveySelector;
