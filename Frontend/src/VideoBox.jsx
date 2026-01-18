@@ -433,6 +433,209 @@ const VideoBox = ({ surveyId }) => {
 
   const currentQuestion = survey?.questions[currentQuestionIndex];
 
+  // Helper function to play TTS audio (wrapped in useCallback to avoid recreation)
+  // Returns a Promise that resolves when the audio finishes playing
+  // Prevents overlapping audio by tracking if audio is currently playing
+  const playTTSAudio = useCallback(async (text) => {
+    if (!text || !text.trim()) {
+      console.warn('playTTSAudio called with empty text');
+      return Promise.resolve();
+    }
+
+    // Wait if audio is currently playing
+    while (isAudioPlayingRef.current) {
+      console.log('⏳ Waiting for current audio to finish...');
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    console.log('🎵 Playing TTS audio for:', text);
+    isAudioPlayingRef.current = true;
+    
+    return new Promise(async (resolve, reject) => {
+      try {
+        console.log('📡 Fetching TTS from:', `${API_URL}/api/text-to-speech`);
+        const response = await fetch(`${API_URL}/api/text-to-speech`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: text,
+            voice_id: "JBFqnCBsd6RMkjVDRZzb", // Adam voice
+            model_id: "eleven_multilingual_v2",
+            output_format: "mp3_44100_128"
+          })
+        });
+
+        console.log('📥 Response status:', response.status, response.statusText);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ Failed to generate speech:', response.status, errorText);
+          isAudioPlayingRef.current = false;
+          reject(new Error(`Failed to generate speech: ${response.status}`));
+          return;
+        }
+
+        // Get audio blob and play it
+        const audioBlob = await response.blob();
+        console.log('🎧 Audio blob received, size:', audioBlob.size, 'bytes, type:', audioBlob.type);
+        
+        if (audioBlob.size === 0) {
+          console.error('❌ Audio blob is empty!');
+          isAudioPlayingRef.current = false;
+          reject(new Error('Audio blob is empty'));
+          return;
+        }
+
+        const audioUrl = URL.createObjectURL(audioBlob);
+        console.log('🔗 Created audio URL:', audioUrl);
+        
+        const audio = new Audio(audioUrl);
+        
+        // Add event listeners for debugging
+        audio.addEventListener('loadstart', () => console.log('🎵 Audio: loadstart'));
+        audio.addEventListener('loadeddata', () => console.log('🎵 Audio: loadeddata'));
+        audio.addEventListener('canplay', () => console.log('🎵 Audio: canplay'));
+        audio.addEventListener('play', () => console.log('▶️ Audio: playing'));
+        audio.addEventListener('pause', () => console.log('⏸️ Audio: paused'));
+        
+        // Resolve promise when audio ends and mark as not playing
+        audio.addEventListener('ended', () => {
+          console.log('✅ Audio: ended');
+          URL.revokeObjectURL(audioUrl);
+          isAudioPlayingRef.current = false;
+          resolve();
+        });
+        
+        audio.addEventListener('error', (e) => {
+          console.error('❌ Audio error:', e);
+          console.error('Audio error details:', audio.error);
+          URL.revokeObjectURL(audioUrl);
+          isAudioPlayingRef.current = false;
+          reject(e);
+        });
+        
+        // Set volume to ensure it's audible
+        audio.volume = 1.0;
+        
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              console.log('✅ Audio playback started successfully');
+            })
+            .catch(err => {
+              console.error('❌ Error playing audio:', err);
+              console.error('This might be due to browser autoplay policy. User interaction may be required.');
+              URL.revokeObjectURL(audioUrl);
+              isAudioPlayingRef.current = false;
+              reject(err);
+            });
+        }
+      } catch (error) {
+        console.error('❌ Error fetching or playing audio:', error);
+        console.error('Error stack:', error.stack);
+        isAudioPlayingRef.current = false;
+        reject(error);
+      }
+    });
+  }, []);
+
+  // Track if workout ready announcement has been played
+  const workoutAnnouncedRef = useRef(false);
+  // Track the last question that was read to prevent duplicate playback
+  const lastQuestionReadRef = useRef(null);
+  // Track if audio is currently playing to prevent overlap
+  const isAudioPlayingRef = useRef(false);
+
+  // Play audio when workout is generated
+  useEffect(() => {
+    if (!workout || !survey || loadingWorkout) return;
+    if (!workout.segments || workout.segments.length === 0) return;
+    // Only announce once when workout is first ready
+    if (workoutAnnouncedRef.current) return;
+
+    // Reset question tracking when workout is ready (so first question will play)
+    lastQuestionReadRef.current = null;
+
+    // Announce that workout is ready
+    const announceWorkoutReady = async () => {
+      workoutAnnouncedRef.current = true;
+      console.log('🔊 Playing workout ready announcement');
+      
+      try {
+        // Wait for the announcement to finish playing
+        await playTTSAudio("Workout ready. Let's begin.");
+        
+        // After announcement finishes, play the first question
+        if (survey.questions && survey.questions[0]) {
+          const firstQuestionKey = `${survey.questions[0].id}-0`;
+          // Only play if not already read
+          if (lastQuestionReadRef.current !== firstQuestionKey) {
+            lastQuestionReadRef.current = firstQuestionKey;
+            console.log('▶️ Playing first question after announcement');
+            // Small delay for better UX
+            setTimeout(() => {
+              playTTSAudio(survey.questions[0].heading);
+            }, 300);
+          }
+        }
+      } catch (error) {
+        console.error('Error in workout announcement:', error);
+      }
+    };
+
+    // Small delay to ensure workout is fully loaded
+    const timeoutId = setTimeout(() => {
+      announceWorkoutReady();
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [workout, survey, loadingWorkout, playTTSAudio]);
+
+  // Play audio when question changes (skip first question if workout just announced - it's handled in workout effect)
+  useEffect(() => {
+    if (!currentQuestion || !survey || !workout) {
+      return;
+    }
+    if (!workout.segments || workout.segments.length === 0) {
+      return;
+    }
+    
+    // Create a unique key for this question
+    const questionKey = `${currentQuestion.id}-${currentQuestionIndex}`;
+    
+    // Skip if this exact question was just read (prevents duplicate from React strict mode or re-renders)
+    if (lastQuestionReadRef.current === questionKey) {
+      return;
+    }
+    
+    // For the first question, if workout was just announced, skip it (it's handled in workout effect)
+    if (currentQuestionIndex === 0 && workoutAnnouncedRef.current) {
+      // Check if it was already played by the workout announcement effect
+      const firstQuestionKey = `${currentQuestion.id}-0`;
+      if (lastQuestionReadRef.current === firstQuestionKey) {
+        return; // Already played by workout announcement
+      }
+      // If workout was announced but first question hasn't been played yet, wait a bit
+      // The workout effect will handle it
+      return;
+    }
+    
+    // Mark this question as read
+    lastQuestionReadRef.current = questionKey;
+    
+    console.log('▶️ Playing question audio:', currentQuestion.heading);
+
+    // Small delay to ensure question is fully displayed
+    const timeoutId = setTimeout(() => {
+      playTTSAudio(currentQuestion.heading);
+    }, 500);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [currentQuestion, survey, workout, currentQuestionIndex, playTTSAudio]);
+
   // Get exercise for each option
   const getExerciseForOption = (optionText) => {
     if (!workout || !currentQuestion || currentQuestion.type === 'open_ended') {
@@ -517,6 +720,19 @@ const VideoBox = ({ surveyId }) => {
               <button onClick={stopWebcam} className="btn-stop">STOP CAMERA</button>
             )}
             <button onClick={resetCounters} className="btn-reset">RESET SCORE</button>
+            {survey && workout && (
+              <button 
+                onClick={() => {
+                  const testText = currentQuestion?.heading || "Testing audio playback";
+                  console.log('🧪 Testing audio with:', testText);
+                  playTTSAudio(testText);
+                }} 
+                className="btn-reset"
+                style={{ marginLeft: '10px' }}
+              >
+                REPLAY AUDIO
+              </button>
+            )}
           </div>
 
           {/* Loading States */}
