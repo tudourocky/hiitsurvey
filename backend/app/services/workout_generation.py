@@ -106,7 +106,6 @@ Return a JSON object with this exact structure:
                     "option": "Option text",
                     "exercise": {{
                         "name": "Exercise name",
-                        "sets": 2,
                         "reps": 10,
                         "duration": null,
                         "equipment": "equipment name or null"
@@ -136,7 +135,7 @@ Make sure the workout is engaging, appropriate for the intensity level, and uses
                 exercise_data = mapping_data.get("exercise", {})
                 exercise = Exercise(
                     name=exercise_data.get("name", "Unknown"),
-                    sets=exercise_data.get("sets"),
+                    sets=None,  # Sets removed - only using reps
                     reps=exercise_data.get("reps"),
                     duration=exercise_data.get("duration"),
                     equipment=exercise_data.get("equipment")
@@ -186,9 +185,9 @@ Make sure the workout is engaging, appropriate for the intensity level, and uses
         
         # Calculate exercise parameters based on intensity
         intensity_multiplier = {
-            "low": {"sets": 1, "reps": 5, "duration": 20},
-            "medium": {"sets": 2, "reps": 10, "duration": 30},
-            "high": {"sets": 3, "reps": 15, "duration": 45}
+            "low": {"reps": 5, "duration": 20},
+            "medium": {"reps": 10, "duration": 30},
+            "high": {"reps": 15, "duration": 45}
         }
         params = intensity_multiplier[preferences.intensity]
         
@@ -214,7 +213,7 @@ Make sure the workout is engaging, appropriate for the intensity level, and uses
                     exercise_name = available_exercises[exercise_index % len(available_exercises)]
                     exercise = Exercise(
                         name=exercise_name,
-                        sets=params["sets"],
+                        sets=None,  # Sets removed - only using reps
                         reps=params["reps"],
                         equipment=None  # Could map from preferences.equipment_available
                     )

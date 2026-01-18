@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import "./SurveySelector.css"
 import ChevronSVG from '../ChevronSVG';
 import Navbar from "../components/Navbar"
+import * as FaIcons from 'react-icons/fa';
+import * as MdIcons from 'react-icons/md';
+import * as FiIcons from 'react-icons/fi';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -94,6 +97,32 @@ const ArcadeSurveySelector = () => {
     setTimeout(() => { wheelLock.current = false; }, 300);
   }
 
+  // Render icon component from icon name
+  const renderIcon = (iconName) => {
+    if (!iconName) return <FaIcons.FaCircle />;
+    
+    // Try Font Awesome icons first
+    if (iconName.startsWith('Fa') && FaIcons[iconName]) {
+      const IconComponent = FaIcons[iconName];
+      return <IconComponent />;
+    }
+    
+    // Try Material Design icons
+    if (iconName.startsWith('Md') && MdIcons[iconName]) {
+      const IconComponent = MdIcons[iconName];
+      return <IconComponent />;
+    }
+    
+    // Try Feather icons
+    if (iconName.startsWith('Fi') && FiIcons[iconName]) {
+      const IconComponent = FiIcons[iconName];
+      return <IconComponent />;
+    }
+    
+    // Fallback
+    return <FaIcons.FaCircle />;
+  };
+
   return (
     <div className="arcade-container scanlines">
       <Navbar />
@@ -124,7 +153,9 @@ const ArcadeSurveySelector = () => {
                       className={`card ${isActive ? 'card-active' : ''}`}
                       style={{ ...getCardStyle(index), cursor: 'pointer' }}
                     >
-                      <div className={`album-art ${isActive ? 'active' : '' }`} style={{ background: mission.color }}>{mission.icon}</div>
+                      <div className={`album-art ${isActive ? 'active' : '' }`} style={{ background: mission.color }}>
+                        {renderIcon(mission.icon)}
+                      </div>
                       <div className="song-info">
                         <div className={`song-title ${isActive ? 'active' : ''}`}>{mission.title}</div>
                         <div className="song-artist">{mission.artist}</div>

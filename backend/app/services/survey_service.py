@@ -479,55 +479,71 @@ class SurveyService:
 
 
     def _generate_icon_for_survey(self, survey: Survey) -> str:
-        """Generate an appropriate icon for a survey using OpenAI"""
+        """Generate an appropriate react-icons icon name for a survey using OpenAI"""
         if not self._openai_client:
             # Fallback to default icon if OpenAI not available
-            return "●"
+            return "FaCircle"
         
         try:
             # Build context about the survey
             questions_summary = ", ".join([q.heading for q in survey.questions[:3]])
             
-            # Common Unicode geometric and symbol characters (not emojis)
+            # Popular react-icons from Font Awesome, Material Design, and Feather
+            # Format: IconName (from react-icons/fa, react-icons/md, react-icons/fi, etc.)
             icon_options = [
-                "●", "▲", "■", "★", "◆", "◇", "◈", "◉", "◎", "◐", "◑", "◒", "◓",
-                "◔", "◕", "◖", "◗", "◘", "◙", "◚", "◛", "◜", "◝", "◞", "◟",
-                "◠", "◡", "◢", "◣", "◤", "◥", "◦", "◧", "◨", "◩", "◪", "◫",
-                "◬", "◭", "◮", "◯", "◰", "◱", "◲", "◳", "◴", "◵", "◶", "◷",
-                "◸", "◹", "◺", "◻", "◼", "◽", "◾", "◿", "⬟", "⬠", "⬡", "⬢",
-                "⬣", "⬤", "⬥", "⬦", "⬧", "⬨", "⬩", "⬪", "⬫", "⬬", "⬭", "⬮",
-                "⬯", "⬰", "⬱", "⬲", "⬳", "⬴", "⬵", "⬶", "⬷", "⬸", "⬹", "⬺",
-                "⬻", "⬼", "⬽", "⬾", "⬿", "⭀", "⭁", "⭂", "⭃", "⭄", "⭅", "⭆",
-                "⭇", "⭈", "⭉", "⭊", "⭋", "⭌", "⭍", "⭎", "⭏", "⭐", "✦", "✧",
-                "✩", "✪", "✫", "✬", "✭", "✮", "✯", "✰", "✱", "✲", "✳", "✴",
-                "✵", "✶", "✷", "✸", "✹", "✺", "✻", "✼", "✽", "✾", "✿", "❀",
-                "❁", "❂", "❃", "❄", "❅", "❆", "❇", "❈", "❉", "❊", "❋"
+                # Fitness & Health
+                "FaDumbbell", "FaRunning", "FaHeartbeat", "FaBicycle", "FaSwimmer", "FaHiking",
+                "MdFitnessCenter", "MdDirectionsRun", "MdPool", "MdSports",
+                # Food & Nutrition
+                "FaAppleAlt", "FaUtensils", "FaCookieBite", "MdRestaurant", "MdLocalDining",
+                # Mental Health & Wellness
+                "FaBrain", "FaLeaf", "FaMoon", "FaSun", "MdSelfImprovement", "MdSpa",
+                # Work & Productivity
+                "FaBriefcase", "FaLaptop", "FaClock", "MdWork", "MdBusinessCenter", "MdSchedule",
+                # Technology
+                "FaMobileAlt", "FaLaptop", "FaTabletAlt", "MdPhoneIphone", "MdComputer",
+                # Social & Relationships
+                "FaUsers", "FaUserFriends", "FaHeart", "MdPeople", "MdGroup", "MdFavorite",
+                # Learning & Education
+                "FaBook", "FaGraduationCap", "FaChalkboardTeacher", "MdSchool", "MdMenuBook",
+                # Hobbies & Interests
+                "FaPalette", "FaMusic", "FaGamepad", "FaCamera", "MdPalette", "MdMusicNote",
+                # Travel & Adventure
+                "FaPlane", "FaMapMarkedAlt", "FaMountain", "MdFlight", "MdPlace", "MdLandscape",
+                # General
+                "FaStar", "FaRocket", "FaGem", "FaFire", "FaLightbulb", "FaChartLine",
+                "MdStar", "MdRocketLaunch", "MdLightbulb", "MdTrendingUp"
             ]
             
-            prompt = f"""Based on this survey, choose the most appropriate Unicode symbol/icon from this list that best represents it.
+            prompt = f"""Based on this survey, choose the most appropriate react-icons icon name that best represents it.
 
 Survey Title: {survey.title}
 Sample Questions: {questions_summary}
 
-Available Icons: {', '.join(icon_options[:30])} (and more geometric shapes)
+Available Icons (react-icons format - use exact name):
+{', '.join(icon_options)}
 
-Choose ONE icon that best matches the survey theme. Consider:
-- Fitness surveys: ▲ (triangle/upward), ● (circle/complete), ★ (star/achievement)
-- Health surveys: ◉ (target), ◎ (focus), ◐ (progress)
-- Work surveys: ■ (square/structured), ◆ (diamond/premium), ◇ (outline/flexible)
-- Learning surveys: ★ (star/knowledge), ◈ (layered), ◉ (concentric)
-- Social surveys: ◯ (open circle/community), ◐ (half circle/balance)
+Choose ONE icon name that best matches the survey theme. Consider:
+- Fitness/Exercise: FaDumbbell, FaRunning, MdFitnessCenter
+- Health/Nutrition: FaHeartbeat, FaAppleAlt, MdRestaurant
+- Mental Health: FaBrain, FaLeaf, MdSelfImprovement
+- Work/Productivity: FaBriefcase, FaLaptop, MdWork
+- Technology: FaMobileAlt, FaLaptop, MdComputer
+- Social: FaUsers, FaUserFriends, MdPeople
+- Learning: FaBook, FaGraduationCap, MdSchool
+- Hobbies: FaPalette, FaMusic, FaGamepad
+- Travel: FaPlane, FaMapMarkedAlt, MdFlight
 
-Return ONLY the single Unicode character, nothing else.
+Return ONLY the icon name (e.g., "FaDumbbell" or "MdFitnessCenter"), nothing else.
 
-Icon:"""
+Icon Name:"""
             
             response = self._openai_client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a helpful assistant that suggests appropriate Unicode geometric symbols for surveys. Always return only a single Unicode character from the provided list, never emojis. The character must be exactly one character."
+                        "content": "You are a helpful assistant that suggests appropriate react-icons icon names for surveys. Always return only the icon name (e.g., FaDumbbell, MdFitnessCenter) from the provided list. The icon name must match exactly one from the list."
                     },
                     {
                         "role": "user",
@@ -535,25 +551,28 @@ Icon:"""
                     }
                 ],
                 temperature=0.8,
-                max_tokens=5
+                max_tokens=20
             )
             
-            icon = response.choices[0].message.content.strip()
-            # Clean up any extra characters
-            icon = icon[0] if len(icon) > 0 else "●"
+            icon_name = response.choices[0].message.content.strip()
+            # Clean up any extra characters or quotes
+            icon_name = icon_name.strip('"\'')
             
-            # Validate it's a single character and not an emoji
-            if len(icon) == 1:
-                # Check if it's in a reasonable Unicode range (not emoji)
-                char_code = ord(icon)
-                if char_code < 0x1F000:  # Not in emoji range
+            # Validate it's a valid icon name from our list
+            if icon_name in icon_options:
+                return icon_name
+            
+            # Try to find a close match
+            icon_lower = icon_name.lower()
+            for icon in icon_options:
+                if icon.lower() == icon_lower or icon_lower in icon.lower():
                     return icon
             
-            # Fallback if response is invalid
-            return "●"
+            # Fallback to default
+            return "FaCircle"
         except Exception as e:
             print(f"Error generating icon: {e}")
-            return "●"
+            return "FaCircle"
     
     def _get_artist_name(self, idx: int) -> str:
         """Get artist name based on index"""

@@ -319,8 +319,23 @@ const VideoBox = ({ surveyId }) => {
     }
 
     // Find the segment for this question
-    const segment = workout.segments.find(s => s.question_id === currentQuestion.id);
+    // Try by question_id first, then by index (q1, q2, q3), then by question text
+    let segment = workout.segments.find(s => s.question_id === currentQuestion.id);
+    
+    if (!segment) {
+      const questionIndexId = `q${currentQuestionIndex + 1}`;
+      segment = workout.segments.find(s => s.question_id === questionIndexId);
+    }
+    
+    if (!segment) {
+      segment = workout.segments.find(s => 
+        s.question === currentQuestion.heading || 
+        s.question.toLowerCase().includes(currentQuestion.heading.toLowerCase())
+      );
+    }
+    
     if (!segment || !segment.option_exercise_mapping) {
+      console.log(`No segment found for question ${currentQuestion.id} at index ${currentQuestionIndex}`);
       setSelectedExercise(null);
       setCurrentExerciseReps(0);
       setIsExerciseComplete(false);
@@ -328,7 +343,14 @@ const VideoBox = ({ surveyId }) => {
     }
 
     // Find the exercise for the selected answer
-    const mapping = segment.option_exercise_mapping.find(m => m.option === answer);
+    let mapping = segment.option_exercise_mapping.find(m => m.option === answer);
+    
+    // Try case-insensitive match if exact match fails
+    if (!mapping) {
+      mapping = segment.option_exercise_mapping.find(m => 
+        m.option.toLowerCase().trim() === answer.toLowerCase().trim()
+      );
+    }
     const newExercise = mapping ? mapping.exercise : null;
     
     // If exercise changed, reset tracking and capture baseline
@@ -413,12 +435,64 @@ const VideoBox = ({ surveyId }) => {
 
   // Get exercise for each option
   const getExerciseForOption = (optionText) => {
-    if (!workout || !currentQuestion || currentQuestion.type === 'open_ended') return null;
+    if (!workout || !currentQuestion || currentQuestion.type === 'open_ended') {
+      return null;
+    }
     
-    const segment = workout.segments.find(s => s.question_id === currentQuestion.id);
-    if (!segment || !segment.option_exercise_mapping) return null;
+    // Try to find segment by question_id first
+    let segment = workout.segments.find(s => s.question_id === currentQuestion.id);
     
-    const mapping = segment.option_exercise_mapping.find(m => m.option === optionText);
+    // If not found, try to match by question index (q1, q2, q3, etc.)
+    if (!segment && currentQuestionIndex !== undefined) {
+      const questionIndexId = `q${currentQuestionIndex + 1}`;
+      segment = workout.segments.find(s => s.question_id === questionIndexId);
+    }
+    
+    // If still not found, try to match by question text/heading
+    if (!segment) {
+      segment = workout.segments.find(s => 
+        s.question === currentQuestion.heading || 
+        s.question.toLowerCase().includes(currentQuestion.heading.toLowerCase()) ||
+        currentQuestion.heading.toLowerCase().includes(s.question.toLowerCase())
+      );
+    }
+    
+    if (!segment) {
+      console.log(`No segment found for question_id: ${currentQuestion.id}`);
+      console.log('Question heading:', currentQuestion.heading);
+      console.log('Question index:', currentQuestionIndex);
+      console.log('Available segments:', workout.segments.map(s => ({ id: s.question_id, question: s.question })));
+      return null;
+    }
+    
+    if (!segment.option_exercise_mapping || segment.option_exercise_mapping.length === 0) {
+      console.log(`No option_exercise_mapping for segment ${segment.question_id}`);
+      return null;
+    }
+    
+    // Try exact match first
+    let mapping = segment.option_exercise_mapping.find(m => m.option === optionText);
+    
+    // If no exact match, try case-insensitive match
+    if (!mapping) {
+      mapping = segment.option_exercise_mapping.find(m => 
+        m.option.toLowerCase().trim() === optionText.toLowerCase().trim()
+      );
+    }
+    
+    // If still no match, try partial match
+    if (!mapping) {
+      mapping = segment.option_exercise_mapping.find(m => 
+        optionText.toLowerCase().includes(m.option.toLowerCase()) ||
+        m.option.toLowerCase().includes(optionText.toLowerCase())
+      );
+    }
+    
+    if (!mapping) {
+      console.log(`No mapping found for option: "${optionText}"`);
+      console.log('Available options:', segment.option_exercise_mapping.map(m => `"${m.option}"`));
+    }
+    
     return mapping ? mapping.exercise : null;
   };
 
@@ -455,17 +529,19 @@ const VideoBox = ({ surveyId }) => {
             </div>
           )}
 
-          {!loadingSurvey && loadingWorkout && survey && (
+          {!loadingSurvey && (loadingWorkout || !workout || !workout?.segments || workout.segments.length === 0) && survey && (
             <div className="survey-section neon-border-blue">
               <div className="loading-container">
                 <div className="loading-spinner"></div>
-                <p className="loading-text neon-text-blue">GENERATING WORKOUT...</p>
+                <p className="loading-text neon-text-blue">
+                  {loadingWorkout ? 'GENERATING WORKOUT...' : 'LOADING EXERCISES...'}
+                </p>
               </div>
             </div>
           )}
 
-          {/* Survey Questions Section */}
-          {!loadingSurvey && !loadingWorkout && survey && currentQuestion && (
+          {/* Survey Questions Section - Only show when everything is ready */}
+          {!loadingSurvey && !loadingWorkout && survey && workout && workout.segments && workout.segments.length > 0 && currentQuestion && (
             <div className="survey-section neon-border-blue">
               <div className="question-header">
                 <h3 className="neon-text-pink">QUESTION {currentQuestionIndex + 1} / {survey.questions.length}</h3>
@@ -478,6 +554,7 @@ const VideoBox = ({ surveyId }) => {
                     const exercise = getExerciseForOption(option.text);
                     const isSelected = answers[currentQuestion.id] === option.text;
                     const isSelectedExercise = isSelected && exercise && exercise.name === selectedExercise?.name;
+                    
                     return (
                       <button
                         key={option.id}
@@ -489,11 +566,9 @@ const VideoBox = ({ surveyId }) => {
                         {exercise && (
                           <div className="option-exercise">
                             <span className="exercise-badge">→ {exercise.name}</span>
-                            {(exercise.sets || exercise.reps) && (
+                            {exercise.reps && (
                               <span className="exercise-specs">
-                                {exercise.sets && `${exercise.sets} sets`}
-                                {exercise.sets && exercise.reps && ' • '}
-                                {exercise.reps && `${exercise.reps} reps`}
+                                {exercise.reps} reps
                               </span>
                             )}
                           </div>
@@ -514,6 +589,7 @@ const VideoBox = ({ surveyId }) => {
                 </div>
               )}
 
+
               {currentQuestion.type === 'open_ended' && (
                 <div className="open-ended-input">
                   <textarea
@@ -533,7 +609,6 @@ const VideoBox = ({ surveyId }) => {
                     <span className="exercise-name">{selectedExercise.name}</span>
                   </div>
                   <div className="exercise-details">
-                    {selectedExercise.sets && <span>Sets: {selectedExercise.sets}</span>}
                     {selectedExercise.reps && (
                       <span className={isExerciseComplete ? 'complete-reps' : ''}>
                         Reps: {currentExerciseReps} / {selectedExercise.reps}

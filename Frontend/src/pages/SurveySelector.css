@@ -52,6 +52,12 @@
   align-items: center;
   justify-content: center;
   font-size: 3rem;
+  color: white;
+}
+
+.album-art svg {
+  width: 60%;
+  height: 60%;
 }
 
 .song-title {
