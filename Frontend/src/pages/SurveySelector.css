@@ -12,6 +12,28 @@
   align-items: center;
   gap: 0px;
   width: 100%;
+  position: relative;
+}
+
+/* Ensure leaderboard transitions smoothly */
+.container .leaderboard-container {
+  margin-top: 0;
+  transition: margin-top 0.3s ease;
+}
+
+/* Add margin to leaderboard when description is expanded */
+.container:has(.song-description.expanded) .leaderboard-container {
+  margin-top: 100px;
+}
+
+/* Ensure carousel container transitions smoothly */
+.carousel-container {
+  transition: min-height 0.3s ease;
+}
+
+/* Also increase carousel container height when expanded */
+.carousel-container:has(.song-description.expanded) {
+  min-height: 500px;
 }
 
 .carousel {
@@ -29,7 +51,7 @@
   margin-left: -110px;
   margin-top: -140px;
   width: 220px;
-  height: 280px;
+  min-height: 280px;
   background: #000;
   border-radius: 10px;
   padding: 1.5rem;
@@ -79,6 +101,50 @@
 .song-artist {
   font-size: 0.5rem;
   color: #666;
+}
+
+.song-description {
+  font-size: 0.45rem;
+  color: #888;
+  margin-top: 0.5rem;
+  line-height: 1.4;
+  max-height: 2.8em; /* Show ~2 lines */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  width: 100%;
+  text-align: left;
+}
+
+.card-active .song-description {
+  color: #aaa;
+}
+
+.song-description:hover {
+  color: var(--neon-blue);
+}
+
+.song-description.expanded {
+  max-height: none;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+  color: var(--neon-blue);
+}
+
+.song-description.expanded:hover {
+  color: var(--neon-blue);
+  text-shadow: 0 0 5px var(--neon-blue);
+}
+
+.description-text {
+  display: block;
+  word-wrap: break-word;
+  white-space: normal;
 }
 
 .subtitle {

@@ -676,6 +676,56 @@ Icon Name:"""
             print(f"Error generating icon: {e}")
             return "FaCircle"
     
+    def _generate_description_for_survey(self, survey: Survey) -> str:
+        """Generate an engaging description for a survey using OpenAI"""
+        if not self._openai_client:
+            # Fallback to default description if OpenAI not available
+            return f"Complete the {survey.title} survey and share your feedback."
+        
+        try:
+            # Build context about the survey
+            questions_summary = ", ".join([q.heading for q in survey.questions[:3]])
+            
+            prompt = f"""Generate a short, engaging description (2-3 sentences max) for this survey that encourages participation.
+
+Survey Title: {survey.title}
+Sample Questions: {questions_summary}
+
+The description should be:
+- Engaging and motivating
+- Concise (2-3 sentences)
+- Explain what the survey is about
+- Encourage users to participate
+
+Return ONLY the description text, nothing else.
+
+Description:"""
+            
+            response = self._openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that creates engaging, concise descriptions for surveys. Always return only the description text (2-3 sentences), nothing else."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                temperature=0.8,
+                max_tokens=100
+            )
+            
+            description = response.choices[0].message.content.strip()
+            # Clean up any extra characters or quotes
+            description = description.strip('"\'')
+            
+            return description if description else f"Complete the {survey.title} survey and share your feedback."
+        except Exception as e:
+            print(f"Error generating description: {e}")
+            return f"Complete the {survey.title} survey and share your feedback."
+    
     def _get_artist_name(self, idx: int) -> str:
         """Get artist name based on index"""
         artists = [
@@ -698,18 +748,27 @@ Icon Name:"""
         ]
         return colors[idx % len(colors)]
     
-    async def _cache_icon_in_mongodb(self, survey_id: str, icon: str):
-        """Cache icon in MongoDB for a survey"""
+    async def _cache_icon_and_description_in_mongodb(self, survey_id: str, icon: str = None, description: str = None):
+        """Cache icon and/or description in MongoDB for a survey in a single operation"""
         try:
             collection = get_surveys_collection()
             if collection is None:
                 return  # MongoDB not available
-            await collection.update_one(
-                {"id": survey_id},
-                {"$set": {"icon": icon, "updated_at": datetime.utcnow()}}
-            )
+            
+            # Build update object with only provided fields
+            update_data = {"updated_at": datetime.utcnow()}
+            if icon is not None:
+                update_data["icon"] = icon
+            if description is not None:
+                update_data["description"] = description
+            
+            if len(update_data) > 1:  # Only update if we have something to cache (beyond updated_at)
+                await collection.update_one(
+                    {"id": survey_id},
+                    {"$set": update_data}
+                )
         except Exception as e:
-            print(f"⚠ Error caching icon in MongoDB for survey {survey_id}: {e}")
+            print(f"⚠ Error caching icon/description in MongoDB for survey {survey_id}: {e}")
     
     async def get_missions_async(self) -> MissionListResponse:
         """Async version of get_missions"""
@@ -720,20 +779,45 @@ Icon Name:"""
         for idx, survey in enumerate(surveys):
             # Check if icon already exists in MongoDB (cached)
             icon = survey.icon if survey.icon else None
+            needs_icon_cache = False
             
-            # If icon doesn't exist, generate it and cache it
+            # If icon doesn't exist, generate it
             if not icon:
                 try:
                     # Generate icon using LLM (with fallback on error)
                     icon = self._generate_icon_for_survey(survey)
-                    # Cache the icon in MongoDB for future use
-                    await self._cache_icon_in_mongodb(survey.id, icon)
-                    print(f"✓ Generated and cached icon for survey {survey.id}: {icon}")
+                    needs_icon_cache = True
+                    print(f"✓ Generated icon for survey {survey.id}: {icon}")
                 except Exception as e:
                     print(f"Error generating icon for survey {survey.id}: {e}")
                     icon = "FaCircle"  # Fallback icon
             else:
                 print(f"✓ Using cached icon for survey {survey.id}: {icon}")
+            
+            # Check if description already exists in MongoDB (cached)
+            description = survey.description if survey.description else None
+            needs_description_cache = False
+            
+            # If description doesn't exist, generate it
+            if not description:
+                try:
+                    # Generate description using LLM (with fallback on error)
+                    description = self._generate_description_for_survey(survey)
+                    needs_description_cache = True
+                    print(f"✓ Generated description for survey {survey.id}")
+                except Exception as e:
+                    print(f"Error generating description for survey {survey.id}: {e}")
+                    description = f"Complete the {survey.title} survey and share your feedback."  # Fallback description
+            else:
+                print(f"✓ Using cached description for survey {survey.id}")
+            
+            # Cache both icon and description in a single MongoDB operation if needed
+            if needs_icon_cache or needs_description_cache:
+                await self._cache_icon_and_description_in_mongodb(
+                    survey.id, 
+                    icon=icon if needs_icon_cache else None,
+                    description=description if needs_description_cache else None
+                )
             
             mission = Mission(
                 id=f"mission_{survey.id}",
@@ -741,7 +825,8 @@ Icon Name:"""
                 artist=self._get_artist_name(idx),
                 icon=icon,
                 color=self._get_color_gradient(idx),
-                survey_id=survey.id
+                survey_id=survey.id,
+                description=description
             )
             missions.append(mission)
         

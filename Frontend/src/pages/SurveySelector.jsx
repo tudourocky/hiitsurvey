@@ -15,6 +15,7 @@ const ArcadeSurveySelector = () => {
   const [missions, setMissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [expandedDescriptions, setExpandedDescriptions] = useState(new Set());
 
   // Fetch missions from backend
   useEffect(() => {
@@ -161,6 +162,27 @@ const ArcadeSurveySelector = () => {
                       <div className="song-info">
                         <div className={`song-title ${isActive ? 'active' : ''}`}>{mission.title}</div>
                         <div className="song-artist">{mission.artist}</div>
+                        {mission.description && (
+                          <div 
+                            className={`song-description ${expandedDescriptions.has(mission.id) ? 'expanded' : ''}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedDescriptions(prev => {
+                                const next = new Set(prev);
+                                if (next.has(mission.id)) {
+                                  next.delete(mission.id);
+                                } else {
+                                  next.add(mission.id);
+                                }
+                                return next;
+                              });
+                            }}
+                          >
+                            <span className="description-text">
+                              {mission.description}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

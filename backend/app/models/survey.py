@@ -31,6 +31,7 @@ class Survey(BaseModel):
     title: str
     questions: List[SurveyQuestionDetail]
     icon: Optional[str] = None  # Cached icon generated from OpenAI
+    description: Optional[str] = None  # Cached description generated from OpenAI
 
 
 class SurveyListResponse(BaseModel):
@@ -53,6 +54,7 @@ class Mission(BaseModel):
     icon: str
     color: str
     survey_id: str
+    description: Optional[str] = None  # AI-generated description
 
 
 class MissionListResponse(BaseModel):
