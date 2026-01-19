@@ -2,6 +2,8 @@
 
 A gamified fitness web application that transforms survey completion into an engaging physical activity. Users complete surveys from SurveyMonkey while performing exercises tracked in real-time through their webcam.
 
+🔗 **Devpost**: [https://devpost.com/software/hiitsurvey](https://devpost.com/software/hiitsurvey)
+
 ## Features
 
 - **Real-time Exercise Detection**: Uses MediaPipe Pose Landmarker to count exercises from webcam video (~10 FPS) with custom computer vision algorithms
