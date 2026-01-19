@@ -4,6 +4,8 @@ A gamified fitness web application that transforms survey completion into an eng
 
 🔗 **Devpost**: [https://devpost.com/software/hiitsurvey](https://devpost.com/software/hiitsurvey)
 
+![Demo](demo.gif)
+
 ## Features
 
 - **Real-time Exercise Detection**: Uses MediaPipe Pose Landmarker to count exercises from webcam video (~10 FPS) with custom computer vision algorithms
